@@ -1,0 +1,29 @@
+[package]
+name = "zombies_gold_2ed"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# Bevy stuff
+bevy = "0.12.1"
+moonshine-save = "0.3.4"
+leafwing-input-manager = "0.11.1"
+# Other
+#sark_grids = {path = "../!_Local-Plugins/sark_grids_rs"} #"0.5.8"
+#grid-tree = "0.2.0"
+#rand = "0.8.5"
+fastrand = "2.0.1"
+#unicode-segmentation = "1.10.1"
+noise = "0.8.2"
+derive_more = "0.99.17"
+
+[features]
+console = []
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
