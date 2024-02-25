@@ -1,6 +1,7 @@
 use std::{cmp::{max, min}, ops::Index};
 use bevy::prelude::*;
 use fastrand::{Rng, choice};
+use sark_grids::Grid;
 //use grid_tree::OctreeU32;
 use noise::{Perlin, NoiseFn, Worley, core::worley::distance_functions::euclidean_squared};
 //use rand::{seq::SliceRandom, thread_rng};
@@ -24,7 +25,6 @@ impl Plugin for MapPlugin {
  */
 
  // Systems
- /*
 pub fn generate_small_map (
     mut commands: Commands,
 
@@ -32,135 +32,104 @@ pub fn generate_small_map (
 
     //mut next_mapgen_state: ResMut<NextState<MapGenState>>,
 ) {
-    let width = 64;
-    let length = 64;
+    let width = 16;
+    let length = 16;
+    let height = 64;
 
-    let world_map = commands.spawn(Map)
-        .insert(Map)
-        .insert(MapSize{width, height})
-        .id();
+    //let bundles = [TerrainType::DeepWater, TerrainType::ShallowWater,
+    //               TerrainType::Plains, TerrainType::Hills, TerrainType::Mountains, TerrainType::Hills];
 
-    let bundles = [TerrainType::DeepWater, TerrainType::ShallowWater,
-                   TerrainType::Plains, TerrainType::Hills, TerrainType::Mountains, TerrainType::Hills];
+    //let mut ranges = ranges_from_weights(&water_weights, [-1.0, SEA_LEVEL]);
+    //ranges.append(&mut ranges_from_weights(&land_weights, [SEA_LEVEL, 1.0]));
 
-    let mut ranges = ranges_from_weights(&water_weights, [-1.0, SEA_LEVEL]);
-    ranges.append(&mut ranges_from_weights(&land_weights, [SEA_LEVEL, 1.0]));
-
-    let mut worley_noise = Worley::new(**seed);
-    worley_noise = worley_noise.set_distance_function(euclidean_squared);
-    worley_noise = worley_noise.set_return_type(noise::core::worley::ReturnType::Distance);
+    //let mut worley_noise = Worley::new(**seed);
+    //worley_noise = worley_noise.set_distance_function(euclidean_squared);
+    //worley_noise = worley_noise.set_return_type(noise::core::worley::ReturnType::Distance);
     let perlin_noise = Perlin::new(**seed);
 
     let worley_scaling = 10.0;
     let perlin_scaling = 5.0;
 
-    let mut altitude_grid: Grid::<f64> = Grid::<f64>::new([width, height]);
+    let mut altitude_grid: Grid::<f64> = Grid::<f64>::new([width, length]);
+    let mut chunk = Chunk(Grid3::filled(Block::new(BlockID::Air), [width, height, length]));
 
     // Set initial values
     for (position, altitude_val) in altitude_grid.iter_2d_mut() {
         let point_x = (position.x as f64) / (width as f64);
-        let point_y = (position.y as f64) / (height as f64);
+        let point_y = (position.y as f64) / (length as f64);
         
-        let worley_x = point_x * worley_scaling;
-        let worley_y = point_y * worley_scaling;
+        //let worley_x = point_x * worley_scaling;
+        //let worley_y = point_y * worley_scaling;
         
         let perlin_x = point_x * perlin_scaling;
         let perlin_y = point_y * perlin_scaling;
         
-        let worley_noise_val = (worley_noise.get([worley_x, worley_y]) + SEA_LEVEL + 1.0 ) / 2.0; // clamp seems to provide uninteresting results. add 1 instead.
-        let perlin_noise_val = create_averaged_noise(point_x, point_y, vec![2.0, 5.0], vec![2.0, 1.0], &perlin_noise);
-        let perlin_noise_val_islands = (perlin_noise.get([perlin_x, perlin_y]) + SEA_LEVEL + 1.0) / 4.0;
+        //let worley_noise_val = (worley_noise.get([worley_x, worley_y]) + SEA_LEVEL + 1.0 ) / 2.0; // clamp seems to provide uninteresting results. add 1 instead.
+        //let perlin_noise_val = create_averaged_noise(point_x, point_y, vec![2.0, 5.0], vec![2.0, 1.0], &perlin_noise);
+        //let perlin_noise_val_islands = (perlin_noise.get([perlin_x, perlin_y]) + SEA_LEVEL + 1.0) / 4.0;
 
-        let noise_val = perlin_noise_val + 
-        if perlin_noise_val > SEA_LEVEL 
-            {worley_noise_val} 
-        else if perlin_noise_val < SEA_LEVEL - 0.25 
-            {perlin_noise_val_islands}  
-        else 
-            {0.0};
+        //let noise_val = perlin_noise_val + 
+        //if perlin_noise_val > SEA_LEVEL 
+        //    {worley_noise_val} 
+        //else if perlin_noise_val < SEA_LEVEL - 0.25 
+        //    {perlin_noise_val_islands}  
+        //else 
+        //    {0.0};
 
-        *altitude_val = noise_val;
+        //*altitude_val = noise_val;
         //println!("x: {}, y: {}, noise: {}", x, y, noise_val);
+
+        let surface_height = (((perlin_noise.get([perlin_x, perlin_y]) + 1.0) / 2.0) * (height as f64 / 4.0)) as i32;
+        for h in 0..surface_height {
+            *chunk.get_mut([position.x, h, position.y]).unwrap() = Block::new(BlockID::Dirt);
+        }
     }
 
-    let mut fill_attempted: Grid::<bool> = Grid::<bool>::new([width, height]);
-    let max_fill = (width / 5) * (height / 5);
+    // TODO: Don't clone this.
+    commands.spawn(chunk.clone());
 
-    // Flood fill small low points on the edges of the map.
-    for (position, _) in map_grid.iter_2d() {
-        if !(position.x == 0 || position.y == 0 || position.x == width - 1 || position.y == height - 1) || fill_attempted[position] || altitude_grid[position] > SEA_LEVEL {
-            continue;
-        }
-
-        let mut flood_positions = vec![position];
-        let mut flood_positions_index = 0;
-        loop {
-            let adj_positions: Vec<IVec2> = flood_positions[flood_positions_index].adj_4().collect();
-            for adj_position in adj_positions {
-                if !flood_positions.contains(&adj_position) && altitude_grid.in_bounds(adj_position) && altitude_grid[adj_position] < SEA_LEVEL {flood_positions.push(adj_position)};
+    for y in (0..height).rev() {
+        for x in 0..width {
+            let block_id = chunk.get([x, y, 0]).unwrap().block_id;
+            if block_id == BlockID::Air {
+                print!(" ");
             }
-
-            fill_attempted[flood_positions[flood_positions_index]] = true;
-
-            flood_positions_index += 1;
-            if flood_positions_index >= flood_positions.len() {
-                break;
+            else {
+                print!("#");
             }
+            //println!("{:?}", chunk.get([x, y, 0]).unwrap().block_id);
         }
-
-        if flood_positions.len() > max_fill as usize {
-            // NOTE: This may appear to not fill in areas that are under the max_fill limit.
-            //       This may be happening due to sea ice being under the sea level altitude limit, so those get counted too.
-            //       And since this system (currently) runs before we create biomes, we can't do anything about this.
-            //       It's probably fine?
-            //println!("rejected due to size: {}", flood_positions.len());
-            //if flood_positions.len() < 200 {
-            //    println!("{:?}", flood_positions);
-            //}
-            continue;
-        }
-
-        for flood_position in flood_positions {
-            altitude_grid[flood_position] = SEA_LEVEL + 0.0001;
-        }
+        println!("");
     }
-
-    // Set up initial terrain
-    // TODO: Make this a different system? Perhaps do things differently? Idk.
-    for (position, altitude_val) in altitude_grid.iter_2d_mut() {
-        let chosen = choose_from_ranges(&ranges, *altitude_val);
-        
-        let terrain = bundles[chosen].spawn_entity(&mut commands);
-        commands.entity(terrain)
-            .insert(Save)
-            .insert(Position(position));
-
-
-        map_grid[position] = Some(terrain);
-    }
-    commands.entity(world_map)
-        .insert(Save)
-        .insert(map_grid)
-        .insert(AltitudeGrid(altitude_grid));
 
     
-    next_mapgen_state.set(MapGenState::TempBand);
+    //next_mapgen_state.set(MapGenState::TempBand);
 }
- */
+
 
 // Data
+#[derive(Default, Clone, Deref, DerefMut, Component)]
 pub struct Chunk(Grid3<Block>);
 
 
 
 // TODO: Optimization: If we're using too much space, we can try and use u8s instead of enums. :)
+#[derive(Default, Clone, Copy)]
 pub struct Block {
     block_id: BlockID,
     damage: u8,
     data: [BlockData; 1],
 }
+impl Block {
+    pub fn new(block_id: BlockID) -> Block {
+        // TODO: Make the BlockData thing be tailored for the block we're making.
+        Block {block_id, damage: 0, data: [BlockData::None]}
+    }
+}
 
+#[derive(Default, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum BlockID {
+    #[default] Air,
     Dirt,
     Stone,
     Log,
@@ -168,10 +137,12 @@ pub enum BlockID {
 impl BlockID {
     fn get_attributes(self) -> BlockAttributes {
         match self {
-            BlockID::Dirt => BlockAttributes { strength: 4, hardness: 0 },
-            BlockID::Stone => BlockAttributes { strength: 6, hardness: 0 },
+            BlockID::Air => BlockAttributes { health: 0, toughness: 0 },
+            BlockID::Dirt => BlockAttributes { health: 4, toughness: 0 },
+            BlockID::Stone => BlockAttributes { health: 6, toughness: 0 },
             // Logs will have special behavior for how they get mined, most likely. (Treefelling)
-            BlockID::Log => BlockAttributes { strength: 2, hardness: 0 },
+            BlockID::Log => BlockAttributes { health: 2, toughness: 0 },
+            
         }
     }
 
@@ -180,7 +151,7 @@ impl BlockID {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 pub enum BlockData {
     #[default] None,
     // For trees and stuff.
@@ -189,8 +160,8 @@ pub enum BlockData {
 
 //TODO: Optimization: If we want to get *really* silly with optimization, we can combine everything here into a single unsigned, and start splitting bytes into nibbles
 pub struct BlockAttributes {
-    strength: u8,
-    hardness: u8,
+    health: u8,
+    toughness: u8,
 }
 
 // Components

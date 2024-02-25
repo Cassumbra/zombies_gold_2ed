@@ -1083,7 +1083,7 @@ dependencies = [
  "bitflags 2.4.2",
  "cexpr",
  "clang-sys",
- "itertools",
+ "itertools 0.12.1",
  "lazy_static",
  "lazycell",
  "proc-macro2",
@@ -2081,6 +2081,15 @@ dependencies = [
 
 [[package]]
 name = "itertools"
+version = "0.10.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b0fd2260e829bddf4cb6ea802289de2f86d6a7a690192fbe91b3f46e0f2c8473"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
@@ -2187,7 +2196,7 @@ dependencies = [
  "bevy",
  "derive_more",
  "fixedbitset",
- "itertools",
+ "itertools 0.12.1",
  "leafwing_input_manager_macros",
  "multimap",
  "once_cell",
@@ -3058,6 +3067,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "sark_grids"
+version = "0.5.8"
+dependencies = [
+ "bevy_reflect",
+ "glam",
+ "itertools 0.10.5",
 ]
 
 [[package]]
@@ -4079,4 +4097,5 @@ dependencies = [
  "leafwing-input-manager",
  "moonshine-save",
  "noise",
+ "sark_grids",
 ]

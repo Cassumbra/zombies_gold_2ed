@@ -84,7 +84,7 @@ fn main () {
 
     .init_resource::<RNGSeed>()
 
-
+    .add_systems(Startup, map::generate_small_map)
     
     /*
     .add_systems(PostUpdate, save_game()
