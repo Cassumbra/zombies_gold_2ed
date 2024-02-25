@@ -1,7 +1,8 @@
 // This is yoinked from sark_grids and modified for 3D purposes.
 // TODO: Add credits of some kind? IDK how that works... sark_grids is MIT license
 
-use std::ops::{Bound, Index, IndexMut, RangeBounds};
+use std::ops::{Bound, Index, IndexMut, RangeBounds, Sub};
+use itertools::Itertools;
 use bevy::{math::*, reflect::Reflect};
 
 use self::point::{GridPoint, Size3d};
@@ -272,47 +273,48 @@ impl<T> Grid3<T> {
         }
     }
 
-    // TODO: I keep commenting out stuff I don't want to implement, but we *defs* need to implement these, i think.
-
-    /*
     /// An iterator over a rectangular portion of the grid defined by the given range.
     ///
-    /// Yields `(IVec2, &T)`, where `IVec2` is the corresponding position of the value in the grid.
-    pub fn rect_iter(
+    /// Yields `(IVec3, &T)`, where `IVec3` is the corresponding position of the value in the grid.
+    pub fn cube_iter(
         &self,
-        range: impl RangeBounds<[i32; 2]>,
-    ) -> impl Iterator<Item = (IVec2, &T)> {
-        let (min, max) = ranges_to_min_max(range, self.size().as_ivec2());
-        (min.y..=max.y)
+        range: impl RangeBounds<[i32; 3]>,
+    ) -> impl Iterator<Item = (IVec3, &T)> {
+        let (min, max) = ranges_to_min_max(range, self.size().as_ivec3());
+        // TODO: I'm not sure if this will work!! Might be a problem...
+        (min.z..=max.z)
+            .cartesian_product(min.y..=max.y)
             .cartesian_product(min.x..=max.x)
-            .map(|(y, x)| {
-                let i = self.transform_lti([x, y]);
-                ((IVec2::new(x, y)), &self.data[i])
+            .map(|((z, y), x)| {
+                let i = self.transform_lti([x, y, z]);
+                ((IVec3::new(x, y, z)), &self.data[i])
             })
     }
 
-    /// Returns an iterator which enumerates the 2d position of every value in the grid.
+    /// Returns an iterator which enumerates the 3d position of every value in the grid.
     ///
-    /// Yields `(IVec2, &T)`, where `IVec2` is the corresponding position of the value in the grid.
-    pub fn iter_2d(&self) -> impl Iterator<Item = (IVec2, &T)> {
-        (0..self.height())
+    /// Yields `(IVec3, &T)`, where `IVec3` is the corresponding position of the value in the grid.
+    pub fn iter_3d(&self) -> impl Iterator<Item = (IVec3, &T)> {
+        // TODO: Ditto
+        (0..self.length())
+            .cartesian_product(0..self.height())
             .cartesian_product(0..self.width())
-            .map(|(y, x)| IVec2::new(x as i32, y as i32))
+            .map(|((z, y), x)| IVec3::new(x as i32, y as i32, z as i32))
             .zip(self.data.iter())
     }
 
-    /// Returns a mutable iterator which enumerates the 2d position of every value in the grid.
+    /// Returns a mutable iterator which enumerates the 3d position of every value in the grid.
     ///
-    /// Yields `(IVec2, &mut T)`, where `IVec2` is the corresponding position of the value in the grid.
-    pub fn iter_2d_mut(&mut self) -> impl Iterator<Item = (IVec2, &mut T)> {
+    /// Yields `(IVec3, &mut T)`, where `IVec3` is the corresponding position of the value in the grid.
+    pub fn iter_3d_mut(&mut self) -> impl Iterator<Item = (IVec3, &mut T)> {
         //let offset = self.pivot_offset;
-        (0..self.height())
+        // TODO: Ditto
+        (0..self.length())
+            .cartesian_product(0..self.height())
             .cartesian_product(0..self.width())
-            .map(move |(y, x)| (Vec2::from([x as f32, y as f32])).as_ivec2())
+            .map(|((z, y), x)| IVec3::new(x as i32, y as i32, z as i32))
             .zip(self.data.iter_mut())
     }
-
-     */
 
     /// Retrieve a linear slice of the underlying grid data.
     pub fn slice(&self) -> &[T] {

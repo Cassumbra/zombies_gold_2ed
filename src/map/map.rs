@@ -116,9 +116,9 @@ pub struct Chunk(Grid3<Block>);
 // TODO: Optimization: If we're using too much space, we can try and use u8s instead of enums. :)
 #[derive(Default, Clone, Copy)]
 pub struct Block {
-    block_id: BlockID,
-    damage: u8,
-    data: [BlockData; 1],
+    pub block_id: BlockID,
+    pub damage: u8,
+    pub data: [BlockData; 1],
 }
 impl Block {
     pub fn new(block_id: BlockID) -> Block {

@@ -17,7 +17,9 @@ sark_grids = {path = "../!_Local-Plugins/sark_grids_rs"} #"0.5.8"
 fastrand = "2.0.1"
 #unicode-segmentation = "1.10.1"
 noise = "0.8.2"
+itertools = "0.12.1"
 derive_more = "0.99.17"
+block-mesh = "0.2.0"
 
 [features]
 console = []

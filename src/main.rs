@@ -31,15 +31,16 @@ use log::*;
 mod map;
 use map::*;
 
-/*
-#[path = "player/player.rs"]
-mod player;
-use player::*;
+
+//#[path = "player/player.rs"]
+//mod player;
+//use player::*;
 
 #[path = "rendering/rendering.rs"]
 mod rendering;
 use rendering::*;
 
+/*
 #[path = "saveload/saveload.rs"]
 mod saveload;
 use saveload::*;
@@ -85,6 +86,8 @@ fn main () {
     .init_resource::<RNGSeed>()
 
     .add_systems(Startup, map::generate_small_map)
+
+    .add_systems(Update, rendering::update_chunk_meshes)
     
     /*
     .add_systems(PostUpdate, save_game()
@@ -102,7 +105,7 @@ fn main () {
 pub struct RNGSeed(u32);
 impl Default for RNGSeed {
     fn default() -> Self {
-        Self(17)
+        Self(2343)
     }
 }
 
