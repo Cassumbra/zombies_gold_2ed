@@ -8,20 +8,25 @@
 
 #![feature(const_fn_floating_point_arithmetic)]
 
-use bevy::{prelude::*, ecs::schedule::ScheduleLabel, window::{exit_on_primary_closed, exit_on_all_closed}, app::AppExit};
+use bevy::{app::AppExit, ecs::schedule::ScheduleLabel, pbr::wireframe::WireframePlugin, prelude::*, render::{settings::{RenderCreation, WgpuFeatures}, RenderPlugin}, window::{exit_on_all_closed, exit_on_primary_closed}};
+use bevy_flycam::PlayerPlugin;
+use bevy_xpbd_3d::{math::Scalar, prelude::*};
 use leafwing_input_manager::prelude::*;
 use moonshine_save::{save::SavePlugin, load::LoadPlugin};
+use bevy::render::settings::WgpuSettings;
+
 //use sark_grids::Grid;
 
 #[path = "spatial/spatial.rs"]
 mod spatial;
 use spatial::*;
 
-/*
+
 #[path = "actions/actions.rs"]
 mod actions;
 use actions::*;
 
+/*
 #[path = "log/log.rs"]
 mod log;
 use log::*;
@@ -32,9 +37,9 @@ mod map;
 use map::*;
 
 
-//#[path = "player/player.rs"]
-//mod player;
-//use player::*;
+#[path = "player/player.rs"]
+mod player;
+use player::*;
 
 #[path = "rendering/rendering.rs"]
 mod rendering;
@@ -76,19 +81,52 @@ pub enum PlayingState {
 
 fn main () {
     App::new()
+    //.insert_resource(WgpuOptions {
+    //    features: WgpuFeatures::POLYGON_MODE_LINE,
+    //    ..Default::default()
+    //})
     .add_plugins(DefaultPlugins)
+    .add_plugins(WireframePlugin)
+    .add_plugins(PhysicsPlugins::default())
+    .insert_resource(Msaa::Sample4)
+    /*
+    .add_plugins(DefaultPlugins.set(RenderPlugin {
+        render_creation: RenderCreation::Automatic(WgpuSettings {
+            features: WgpuFeatures::POLYGON_MODE_LINE,
+            ..default()
+        },
+    ),
+    ..default()
+    }))
+      */
+
     // This plugin maps inputs to an input-type agnostic action-state
     // We need to provide it with an enum which stores the possible actions a player could take
     .add_plugins(InputManagerPlugin::<Action>::default())
     // The InputMap and ActionState components will be added to any entity with the Player component
 
+    .add_plugins(PlayerPlugin)
+
+    .add_plugins(ActionsPlugin)
 
     .init_resource::<RNGSeed>()
 
     .add_systems(Startup, map::generate_small_map)
+    .add_systems(Startup, setup)
 
     .add_systems(Update, rendering::update_chunk_meshes)
-    
+    /*
+    .add_systems(
+        Update,
+        (
+            player_input_game,
+            movement::update_grounded,
+            movement::movement,
+            movement::apply_movement_damping,
+        )
+            .chain(),
+    )
+     */
     /*
     .add_systems(PostUpdate, save_game()
         .include_resource::<animated_tiles::ScrollingNoiseSpeed>()
@@ -116,13 +154,87 @@ enum Action {
     Crouch, Jump,
 }
 
-const INPUT_MAP: [(KeyCode, Action); 6] = [(KeyCode::W, Action::MoveForward), (KeyCode::S, Action::MoveBackward),
-                                            (KeyCode::A, Action::MoveLeft), (KeyCode::D, Action::MoveRight),
-                                            (KeyCode::ShiftLeft, Action::Crouch), (KeyCode::Space, Action::Jump),
+const INPUT_MAP: [(Action, KeyCode); 6] = [(Action::MoveForward, KeyCode::KeyW), (Action::MoveBackward, KeyCode::KeyS),
+                                            (Action::MoveLeft, KeyCode::KeyA), (Action::MoveRight, KeyCode::KeyD),
+                                            (Action::Crouch, KeyCode::ShiftLeft), (Action::Jump, KeyCode::Space),
                                           ];
 
 pub fn app_exit (mut events: EventReader<AppExit>) -> bool {
     !events.is_empty()
+}
+
+pub fn setup(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    assets: Res<AssetServer>,
+) {
+
+    let height = 1.0;
+
+    commands.spawn((
+        PbrBundle {
+            mesh: meshes.add(Cuboid::default()),
+            material: materials.add(Color::rgb(0.8, 0.7, 0.6)),
+            transform: Transform::from_xyz(3.0, 2.0, 3.0),
+            ..default()
+        },
+    ));
+
+    /* 
+    // Camera
+    let camera = commands.spawn(Camera3dBundle {
+        transform: Transform::from_xyz(0.0, height, 0.0),
+        ..default()
+    })
+    .id();
+
+    // Player
+    commands.spawn((
+        
+        PbrBundle {
+            mesh: meshes.add(Capsule3d::new(0.4, height)),
+            material: materials.add(Color::rgb(0.8, 0.7, 0.6)),
+            transform: Transform::from_xyz(0.0, 1.5, 0.0),
+            ..default()
+        },
+        
+        movement::CharacterControllerBundle::new(Collider::capsule(height, 0.4)).with_movement(
+            30.0,
+            0.92,
+            7.0,
+            (30.0 as Scalar).to_radians(),
+        ),
+        Friction::ZERO.with_combine_rule(CoefficientCombine::Min),
+        Restitution::ZERO.with_combine_rule(CoefficientCombine::Min),
+        GravityScale(2.0),
+        Player,
+        InputManagerBundle::<Action> {
+            // Stores "which actions are currently pressed"
+            action_state: ActionState::default(),
+            // Describes how to convert from player inputs into those actions
+            input_map: InputMap::new(INPUT_MAP),
+        },
+        //Transform::default(),
+        //GlobalTransform::default(),
+    ))
+    .add_child(camera);
+    */
+
+
+    // Light
+    commands.spawn(PointLightBundle {
+        point_light: PointLight {
+            intensity: 2_000_000.0,
+            range: 50.0,
+            shadows_enabled: true,
+            ..default()
+        },
+        transform: Transform::from_xyz(0.0, 15.0, 0.0),
+        ..default()
+    });
+
+    
 }
 
 /*

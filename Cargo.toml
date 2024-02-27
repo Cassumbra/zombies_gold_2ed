@@ -7,9 +7,10 @@ edition = "2021"
 
 [dependencies]
 # Bevy stuff
-bevy = "0.12.1"
-moonshine-save = "0.3.4"
-leafwing-input-manager = "0.11.1"
+bevy = "0.13"
+bevy_xpbd_3d = "0.4.2"
+moonshine-save = "0.3.5"
+leafwing-input-manager = "0.13"
 # Other
 sark_grids = {path = "../!_Local-Plugins/sark_grids_rs"} #"0.5.8"
 #grid-tree = "0.2.0"
@@ -20,6 +21,7 @@ noise = "0.8.2"
 itertools = "0.12.1"
 derive_more = "0.99.17"
 block-mesh = "0.2.0"
+bevy_flycam = {path = "../!_Local-Plugins/bevy_flycam"}
 
 [features]
 console = []

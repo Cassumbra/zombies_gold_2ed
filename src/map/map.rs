@@ -48,15 +48,15 @@ pub fn generate_small_map (
     let perlin_noise = Perlin::new(**seed);
 
     let worley_scaling = 10.0;
-    let perlin_scaling = 5.0;
+    let perlin_scaling = 0.1;
 
     let mut altitude_grid: Grid::<f64> = Grid::<f64>::new([width, length]);
     let mut chunk = Chunk(Grid3::filled(Block::new(BlockID::Air), [width, height, length]));
 
     // Set initial values
     for (position, altitude_val) in altitude_grid.iter_2d_mut() {
-        let point_x = (position.x as f64) / (width as f64);
-        let point_y = (position.y as f64) / (length as f64);
+        let point_x = (position.x as f64); // / (width as f64);
+        let point_y = (position.y as f64); // / (length as f64);
         
         //let worley_x = point_x * worley_scaling;
         //let worley_y = point_y * worley_scaling;
