@@ -193,14 +193,15 @@ pub fn setup(
 
     // Player
     commands.spawn((
-        
+        /*
         PbrBundle {
             mesh: meshes.add(Capsule3d::new(0.4, height)),
             material: materials.add(Color::rgb(0.8, 0.7, 0.6)),
             transform: Transform::from_xyz(0.0, 1.5, 0.0),
             ..default()
         },
-        
+         */
+        SpatialBundle::default(),
         movement::CharacterControllerBundle::new(Collider::capsule(height, 0.4)).with_movement(
             30.0,
             0.92,
