@@ -21,7 +21,7 @@ noise = "0.8.2"
 itertools = "0.12.1"
 derive_more = "0.99.17"
 block-mesh = "0.2.0"
-bevy_flycam = {path = "../!_Local-Plugins/bevy_flycam"}
+#bevy_flycam = {path = "../!_Local-Plugins/bevy_flycam"}
 
 [features]
 console = []

@@ -515,13 +515,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bevy_flycam"
-version = "0.13.0"
-dependencies = [
- "bevy",
-]
-
-[[package]]
 name = "bevy_gilrs"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4647,7 +4640,6 @@ name = "zombies_gold_2ed"
 version = "0.1.0"
 dependencies = [
  "bevy",
- "bevy_flycam",
  "bevy_xpbd_3d",
  "block-mesh",
  "derive_more",

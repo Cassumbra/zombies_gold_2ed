@@ -1,6 +1,8 @@
 use bevy::prelude::*;
 use bevy::render::mesh::{Indices, MeshVertexAttribute, PrimitiveTopology, VertexAttributeValues};
 use bevy::render::render_asset::RenderAssetUsages;
+use bevy_xpbd_3d::components::RigidBody;
+use bevy_xpbd_3d::plugins::collision::{Collider, ColliderAabb};
 
 use crate::Chunk;
 
@@ -96,7 +98,7 @@ pub fn update_chunk_meshes (
 
         //println!("{:?}", render_mesh);
 
-        let mesh_handle = meshes.add(render_mesh);
+        let mesh_handle = meshes.add(render_mesh.clone());
 
         let mut material = StandardMaterial::from(Color::rgb(0.0, 0.0, 0.0));
         material.perceptual_roughness = 0.9;
@@ -120,6 +122,9 @@ pub fn update_chunk_meshes (
             inherited_visibility: todo!(),
             view_visibility: todo!(),
              */
-        });
+        })
+        // TODO: This isn't the right system for this, really. Oh well.
+        .insert(Collider::convex_decomposition_from_mesh(&render_mesh).unwrap())
+        .insert(RigidBody::Static);
     }
 }

@@ -1,7 +1,7 @@
 // All this shit below is yoinked straight from bevy_xpbd's dynamic_character_3d example.
 // Some modifications will be made as needed.
 
-use bevy::{ecs::query::Has, prelude::*};
+use bevy::{ecs::query::Has, prelude::*, transform};
 use bevy_xpbd_3d::{math::*, prelude::*};
 
 
@@ -167,6 +167,7 @@ pub fn movement(
         &JumpImpulse,
         &mut LinearVelocity,
         Has<Grounded>,
+        &Transform
     )>,
 ) {
     // Precision is adjusted so that the example works with
@@ -175,10 +176,9 @@ pub fn movement(
 
     for event in movement_event_reader.read() {
         
-        if let Ok((movement_acceleration, jump_impulse, mut linear_velocity, is_grounded)) = controllers.get_mut(event.entity) {
+        if let Ok((movement_acceleration, jump_impulse, mut linear_velocity, is_grounded, transform)) = controllers.get_mut(event.entity) {
             match event.movement {
                 MovementType::Move(direction) => {
-                    
                     linear_velocity.x += direction.x * movement_acceleration.0 * delta_time;
                     linear_velocity.z -= direction.y * movement_acceleration.0 * delta_time;
                 }

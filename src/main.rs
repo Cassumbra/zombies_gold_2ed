@@ -9,7 +9,7 @@
 #![feature(const_fn_floating_point_arithmetic)]
 
 use bevy::{app::AppExit, ecs::schedule::ScheduleLabel, pbr::wireframe::WireframePlugin, prelude::*, render::{settings::{RenderCreation, WgpuFeatures}, RenderPlugin}, window::{exit_on_all_closed, exit_on_primary_closed}};
-use bevy_flycam::PlayerPlugin;
+//use bevy_flycam::PlayerPlugin;
 use bevy_xpbd_3d::{math::Scalar, prelude::*};
 use leafwing_input_manager::prelude::*;
 use moonshine_save::{save::SavePlugin, load::LoadPlugin};
@@ -105,7 +105,7 @@ fn main () {
     .add_plugins(InputManagerPlugin::<Action>::default())
     // The InputMap and ActionState components will be added to any entity with the Player component
 
-    .add_plugins(PlayerPlugin)
+    //.add_plugins(PlayerPlugin)
 
     .add_plugins(ActionsPlugin)
 
@@ -115,7 +115,7 @@ fn main () {
     .add_systems(Startup, setup)
 
     .add_systems(Update, rendering::update_chunk_meshes)
-    /*
+    
     .add_systems(
         Update,
         (
@@ -126,7 +126,7 @@ fn main () {
         )
             .chain(),
     )
-     */
+    
     /*
     .add_systems(PostUpdate, save_game()
         .include_resource::<animated_tiles::ScrollingNoiseSpeed>()
@@ -152,11 +152,13 @@ enum Action {
     MoveForward, MoveBackward,
     MoveLeft, MoveRight,
     Crouch, Jump,
+    Look,
 }
 
-const INPUT_MAP: [(Action, KeyCode); 6] = [(Action::MoveForward, KeyCode::KeyW), (Action::MoveBackward, KeyCode::KeyS),
-                                            (Action::MoveLeft, KeyCode::KeyA), (Action::MoveRight, KeyCode::KeyD),
-                                            (Action::Crouch, KeyCode::ShiftLeft), (Action::Jump, KeyCode::Space),
+const INPUT_MAP: [(Action, InputKind); 7] = [(Action::MoveForward, InputKind::PhysicalKey(KeyCode::KeyW)), (Action::MoveBackward, InputKind::PhysicalKey(KeyCode::KeyS)),
+                                            (Action::MoveLeft, InputKind::PhysicalKey(KeyCode::KeyA)), (Action::MoveRight, InputKind::PhysicalKey(KeyCode::KeyD)),
+                                            (Action::Crouch, InputKind::PhysicalKey(KeyCode::ShiftLeft)), (Action::Jump, InputKind::PhysicalKey(KeyCode::Space)),
+                                            (Action::Look, InputKind::DualAxis(DualAxis::mouse_motion()))
                                           ];
 
 pub fn app_exit (mut events: EventReader<AppExit>) -> bool {
@@ -181,7 +183,7 @@ pub fn setup(
         },
     ));
 
-    /* 
+    
     // Camera
     let camera = commands.spawn(Camera3dBundle {
         transform: Transform::from_xyz(0.0, height, 0.0),
@@ -219,7 +221,7 @@ pub fn setup(
         //GlobalTransform::default(),
     ))
     .add_child(camera);
-    */
+    
 
 
     // Light

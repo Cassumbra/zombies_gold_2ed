@@ -10,6 +10,7 @@ use leafwing_input_manager::action_state::ActionState;
 use leafwing_input_manager::input_mocking::QueryInput;
 
 use crate::movement::{Grounded, JumpImpulse, MovementAcceleration, MovementAction, MovementType};
+use crate::point::Point3d;
 use crate::Action;
 
 //use crate::rendering::window::WindowChangeEvent;
@@ -23,32 +24,45 @@ pub struct Player;
 /// Player input.
 pub fn player_input_game (
     //query: Query<(Entity, &ActionState<Action>, &MovementAcceleration, &JumpImpulse, &mut LinearVelocity, Has<Grounded>,), (With<Player>)>,
-    query: Query<(Entity, &ActionState<Action>, &GlobalTransform), (With<Player>)>,
+    mut query: Query<(Entity, &ActionState<Action>, &mut Transform), (With<Player>)>,
     mut movement_event_writer: EventWriter<MovementAction>,
 ) {
     // TODO: Perhaps we should send events for movement instead of moving directly?
-    if let Ok((player, action_state, transform)) = query.get_single() {
+    if let Ok((player, action_state, mut transform)) = query.get_single_mut() {
         //println!("{:?}", transform.translation());
-        // Modified from bevy_xpbd's examples.
-        let forward = action_state.pressed(&Action::MoveForward);
-        let backward = action_state.pressed(&Action::MoveBackward);
-        let left = action_state.pressed(&Action::MoveLeft);
-        let right = action_state.pressed(&Action::MoveRight);
+        // Modified from bevy_xpbd's examples + bevy_flycam
+        let forward = Vec3::from(transform.forward());
+        let right = Vec3::from(transform.right());
 
-        let vertical = forward as i8 - backward as i8;
-        let horizontal = right as i8 - left as i8;
-        let direction = Vector2::new(horizontal as Scalar, vertical as Scalar).clamp_length_max(1.0);
+        let mut direction = Vec3::ZERO;
 
-        if direction != Vector2::ZERO {
-            movement_event_writer.send(MovementAction::new(player, MovementType::Move(direction) ));
+        if action_state.pressed(&Action::MoveForward) {
+            direction += forward;
+        }
+        if action_state.pressed(&Action::MoveBackward) {
+            direction -= forward;
+        }
+        if action_state.pressed(&Action::MoveRight) {
+            direction += right;
+        }
+        if action_state.pressed(&Action::MoveLeft) {
+            direction -= right;
+        }
+
+        //direction = direction.normalize_or_zero();
+
+        if direction != Vec3::ZERO {
+            movement_event_writer.send(MovementAction::new(player, MovementType::Move(Vec2::new(direction.x, direction.z)) ));
         }
 
         if action_state.pressed(&Action::Jump) {
             movement_event_writer.send(MovementAction::new(player, MovementType::Jump));
         }
-    }
 
-    
+        if let Some(look) = action_state.axis_pair(&Action::Look) {
+            transform.rotate_y(look.x() *  -0.001);
+        }
+    }   
 }
 
 /*
