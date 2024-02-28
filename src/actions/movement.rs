@@ -180,7 +180,7 @@ pub fn movement(
             match event.movement {
                 MovementType::Move(direction) => {
                     linear_velocity.x += direction.x * movement_acceleration.0 * delta_time;
-                    linear_velocity.z -= direction.y * movement_acceleration.0 * delta_time;
+                    linear_velocity.z += direction.y * movement_acceleration.0 * delta_time;
                 }
                 MovementType::Jump => {
                     //if is_grounded {
