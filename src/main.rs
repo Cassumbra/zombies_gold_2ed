@@ -176,7 +176,7 @@ pub fn update_chunk_colliders (
         // TODO: Optimize this. we don't need colliders if a block is touching air.
         let colliders: Vec::<(Vector, Quat, Collider)> = chunk.iter_3d().filter_map(|(position, block)| {
             if block.block_id != BlockID::Air {
-                Some((Vector::from(position.as_vec3()), Quat::IDENTITY, Collider::cuboid(1.0, 1.0, 1.0)))
+                Some((Vector::from(position.as_vec3() + Vec3::new(1.5, 1.5, 1.5)), Quat::IDENTITY, Collider::cuboid(1.0, 1.0, 1.0)))
             }
             else {
                 None
@@ -206,10 +206,12 @@ pub fn setup(
         PbrBundle {
             mesh: meshes.add(Cuboid::default()),
             material: materials.add(Color::rgb(0.8, 0.7, 0.6)),
-            transform: Transform::from_xyz(3.0, 2.0, 3.0),
+            transform: Transform::from_xyz(7.0, 25.0, 7.0),
             ..default()
         },
-    ));
+    ))
+    .insert(RigidBody::Dynamic)
+    .insert(Collider::cuboid(1.0, 1.0, 1.0));
 
     
     // Camera

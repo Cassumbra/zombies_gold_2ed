@@ -33,7 +33,7 @@ impl MergeVoxel for BoolVoxel {
     }
 }
 
-type ChunkShape = ConstShape3u32<16, 64, 16>;
+type ChunkShape = ConstShape3u32<18, 66, 18>;
 
 
 
@@ -47,10 +47,10 @@ pub fn update_chunk_meshes (
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
     for (entity, chunk) in query.iter() {
-        let mut voxels = [EMPTY; ChunkShape::SIZE as usize];
+        let mut voxels = [FULL; ChunkShape::SIZE as usize];
         
-        for (i, block) in chunk.iter().enumerate() {
-            voxels[i] = match block.block_id {
+        for (i, block) in chunk.iter_3d() {
+            voxels[ChunkShape::linearize([(i.x + 1) as u32, (i.y + 1) as u32, (i.z + 1) as u32]) as usize] = match block.block_id {
                 crate::BlockID::Air => EMPTY,
                 _ => FULL
             }
@@ -63,7 +63,7 @@ pub fn update_chunk_meshes (
             &voxels,
             &ChunkShape {},
             [0; 3],
-            [15, 63, 15],
+            [17, 65, 17],
             &faces,
             &mut buffer,
         );
