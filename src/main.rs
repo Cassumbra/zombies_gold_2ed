@@ -10,7 +10,7 @@
 
 use bevy::{app::AppExit, ecs::schedule::ScheduleLabel, pbr::wireframe::WireframePlugin, prelude::*, render::{settings::{RenderCreation, WgpuFeatures}, RenderPlugin}, window::{exit_on_all_closed, exit_on_primary_closed}};
 //use bevy_flycam::PlayerPlugin;
-use bevy_xpbd_3d::{math::Scalar, prelude::*};
+use bevy_xpbd_3d::{math::{Scalar, Vector}, prelude::*};
 use leafwing_input_manager::prelude::*;
 use moonshine_save::{save::SavePlugin, load::LoadPlugin};
 use bevy::render::settings::WgpuSettings;
@@ -115,6 +115,7 @@ fn main () {
     .add_systems(Startup, setup)
 
     .add_systems(Update, rendering::update_chunk_meshes)
+    .add_systems(Update, update_chunk_colliders)
     
     .add_systems(
         Update,
@@ -165,6 +166,33 @@ pub fn app_exit (mut events: EventReader<AppExit>) -> bool {
     !events.is_empty()
 }
 
+
+pub fn update_chunk_colliders (
+    mut commands: Commands,
+
+    query: Query<(Entity, &Chunk), Or<(Added<Chunk>, Changed<Chunk>)>>,
+) {
+    for (entity, chunk) in &query {
+        // TODO: Optimize this. we don't need colliders if a block is touching air.
+        let colliders: Vec::<(Vector, Quat, Collider)> = chunk.iter_3d().filter_map(|(position, block)| {
+            if block.block_id != BlockID::Air {
+                Some((Vector::from(position.as_vec3()), Quat::IDENTITY, Collider::cuboid(1.0, 1.0, 1.0)))
+            }
+            else {
+                None
+            }
+            
+        
+        }).collect();
+
+        commands.entity(entity)
+        .insert(Collider::compound(colliders))
+        .insert(RigidBody::Static);
+    }
+}
+
+
+
 pub fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -186,7 +214,7 @@ pub fn setup(
     
     // Camera
     let camera = commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(0.0, height, 0.0),
+        transform: Transform::from_xyz(0.0, height * 0.8, 0.0),
         ..default()
     })
     .id();
@@ -202,7 +230,7 @@ pub fn setup(
         },
          */
         SpatialBundle::default(),
-        movement::CharacterControllerBundle::new(Collider::capsule(height, 0.4)).with_movement(
+        movement::CharacterControllerBundle::new(Collider::cylinder(height, 0.4)).with_movement(
             30.0,
             0.92,
             7.0,

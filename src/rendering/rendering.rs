@@ -122,9 +122,6 @@ pub fn update_chunk_meshes (
             inherited_visibility: todo!(),
             view_visibility: todo!(),
              */
-        })
-        // TODO: This isn't the right system for this, really. Oh well.
-        .insert(Collider::convex_decomposition_from_mesh(&render_mesh).unwrap())
-        .insert(RigidBody::Static);
+        });
     }
 }
