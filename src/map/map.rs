@@ -80,14 +80,21 @@ pub fn generate_small_map (
         //println!("x: {}, y: {}, noise: {}", x, y, noise_val);
 
         let surface_height = (((perlin_noise.get([perlin_x, perlin_y]) + 1.0) / 2.0) * (height as f64 / 4.0)) as i32;
-        for h in 0..surface_height {
-            *chunk.get_mut([position.x, h, position.y]).unwrap() = Block::new(BlockID::Dirt);
+        for h in 0..=surface_height {
+            if h == surface_height {
+                *chunk.get_mut([position.x, h, position.y]).unwrap() = Block::new(BlockID::Grass);
+            }
+            else {
+                *chunk.get_mut([position.x, h, position.y]).unwrap() = Block::new(BlockID::Dirt);
+            }
+            
         }
     }
 
     // TODO: Don't clone this.
     commands.spawn(chunk.clone());
 
+    /*
     for y in (0..height).rev() {
         for x in 0..width {
             let block_id = chunk.get([x, y, 0]).unwrap().block_id;
@@ -101,7 +108,7 @@ pub fn generate_small_map (
         }
         println!("");
     }
-
+    */
     
     //next_mapgen_state.set(MapGenState::TempBand);
 }
@@ -135,6 +142,7 @@ impl Block {
 pub enum BlockID {
     #[default] Air,
     Dirt,
+    Grass,
     Stone,
     Log,
 }
@@ -142,8 +150,9 @@ impl BlockID {
     fn get_attributes(self) -> BlockAttributes {
         match self {
             BlockID::Air => BlockAttributes { health: 0, ..default()  },
-            BlockID::Dirt => BlockAttributes { health: 4, ..default() },
-            BlockID::Stone => BlockAttributes { health: 6, ..default() },
+            BlockID::Dirt => BlockAttributes { health: 4, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 0)), ..default() },
+            BlockID::Grass => BlockAttributes { health: 4, tex_coords: TextureCoords::asymmetric_y(IVec2::new(0, 1), IVec2::new(0, 0), IVec2::new(1, 1)), breaks_into: BlockID::Dirt, ..default() },
+            BlockID::Stone => BlockAttributes { health: 6, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 2)), ..default() },
             // Logs will have special behavior for how they get mined, most likely. (Treefelling)
             BlockID::Log => BlockAttributes { health: 2, ..default() },
             
@@ -165,9 +174,10 @@ pub enum BlockData {
 //TODO: Optimization: If we want to get *really* silly with optimization, we can combine everything here into a single unsigned, and start splitting bytes into nibbles
 #[derive(Default, Clone, Copy)]
 pub struct BlockAttributes {
-    health: u8,
-    toughness: u8,
-    tex_coords: TextureCoords,
+    pub health: u8,
+    pub toughness: u8,
+    pub tex_coords: TextureCoords,
+    pub breaks_into: BlockID,
 }
 /*
 impl BlockAttributes {
@@ -180,18 +190,18 @@ impl BlockAttributes {
 // We might as well make this a struct instead of an enum, since it'll be the same size either way, and this will let us clarify what is what better.
 #[derive(Default, Clone, Copy)]
 pub struct TextureCoords {
-    top: IVec2,
-    bottom: IVec2,
-    north: IVec2,
-    south: IVec2,
-    east: IVec2,
-    west: IVec2,
+    pub top: IVec2,
+    pub bottom: IVec2,
+    pub north: IVec2,
+    pub south: IVec2,
+    pub east: IVec2,
+    pub west: IVec2,
 }
 impl TextureCoords {
     pub fn symmetrical(coord: IVec2) -> TextureCoords {
         TextureCoords { top: coord, bottom: coord, north: coord, south: coord, east: coord, west: coord }
     }
-    pub fn assymetric_y(top: IVec2, bottom: IVec2, sides: IVec2) -> TextureCoords {
+    pub fn asymmetric_y(top: IVec2, bottom: IVec2, sides: IVec2) -> TextureCoords {
         TextureCoords { top, bottom, north: sides, south: sides, east: sides, west: sides }
     }
 }

@@ -93,10 +93,19 @@ fn main () {
     //    features: WgpuFeatures::POLYGON_MODE_LINE,
     //    ..Default::default()
     //})
-    .add_plugins(DefaultPlugins)
+    .add_plugins(
+        DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                title: "3D Zombies Gold".into(),
+                ..default()
+            }),
+            ..default()
+        })
+        .set(ImagePlugin::default_nearest())
+    )
     .add_plugins(WireframePlugin)
     .add_plugins(PhysicsPlugins::default())
-    .insert_resource(Msaa::Sample4)
+    //.insert_resource(Msaa::Sample4)
 
     .init_state::<GameState>()
         .add_loading_state(
@@ -223,6 +232,8 @@ pub fn setup(
 
     let height = 1.0;
 
+    // Emotional support cube. Uncomment when needed.
+    /*
     commands.spawn((
         PbrBundle {
             mesh: meshes.add(Cuboid::default()),
@@ -233,7 +244,7 @@ pub fn setup(
     ))
     .insert(RigidBody::Dynamic)
     .insert(Collider::cuboid(1.0, 1.0, 1.0));
-
+     */
     
     // Camera
     let camera = commands.spawn(Camera3dBundle {

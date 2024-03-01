@@ -7,7 +7,7 @@ use bevy_xpbd_3d::plugins::collision::{Collider, ColliderAabb};
 use crate::{Atlas, Chunk, TextureAtlas};
 
 use block_mesh::ndshape::{ConstShape, ConstShape3u32};
-use block_mesh::{greedy_quads, visible_block_faces, GreedyQuadsBuffer, MergeVoxel, UnitQuadBuffer, Voxel, VoxelVisibility, RIGHT_HANDED_Y_UP_CONFIG};
+use block_mesh::{greedy_quads, visible_block_faces, GreedyQuadsBuffer, MergeVoxel, UnitQuadBuffer, UnorientedQuad, Voxel, VoxelVisibility, RIGHT_HANDED_Y_UP_CONFIG};
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 struct BoolVoxel(bool);
@@ -69,25 +69,50 @@ pub fn update_chunk_meshes (
             &mut buffer,
         );
 
-        println!("unitquadbuffer: {:?}", buffer.groups.clone());
+        //println!("unitquadbuffer: {:?}", buffer.groups.clone());
 
         let num_indices = buffer.num_quads() * 6;
         let num_vertices = buffer.num_quads() * 4;
         let mut indices = Vec::with_capacity(num_indices);
         let mut positions = Vec::with_capacity(num_vertices);
         let mut normals = Vec::with_capacity(num_vertices);
+        let mut uvs = Vec::with_capacity(num_vertices);
         for (group, face) in buffer.groups.into_iter().zip(faces.into_iter()) {
             for quad in group.into_iter() {
                 indices.extend_from_slice(&face.quad_mesh_indices(positions.len() as u32));
                 positions.extend_from_slice(&face.quad_mesh_positions(&quad.into(), 1.0));
                 normals.extend_from_slice(&face.quad_mesh_normals());
+
+                let block_id = chunk[UVec3::from(quad.minimum) - UVec3::new(1, 1, 1)];
+                let attributes = block_id.get_attributes();
+                let normal = face.signed_normal();
+
+                let tex_coord = if normal.x == 1 {attributes.tex_coords.east}
+                             else if normal.x == -1 {attributes.tex_coords.west}
+                             else if normal.y == 1 {attributes.tex_coords.top}
+                             else if normal.y == -1 {attributes.tex_coords.bottom}
+                             else if normal.z == 1 {attributes.tex_coords.north}
+                             else {attributes.tex_coords.west};
+
+                let quad_uvs = face.tex_coords(RIGHT_HANDED_Y_UP_CONFIG.u_flip_face, true, &UnorientedQuad::from(quad)).map(|uv| {
+                    let mut u = uv[0] * 8.0;
+                    let mut v = uv[1] * 8.0;
+                    if u != 0.0 {u -= 1.0};
+                    if v != 0.0 {v -= 1.0};
+                    u += tex_coord.x as f32 * 8.0;
+                    v += tex_coord.y as f32 * 8.0;
+                    [u/256.0, v/256.0]
+                });
+
+                uvs.extend_from_slice(&quad_uvs);
             }
         }
 
-        println!("positions: {:?}", positions);
+        //println!("uvs: {:?}", uvs);
+        //println!("positions: {:?}", positions);
         //println!("indices: {:?}", indices);
 
-        // TODO: Should we maybe set this to RENDER_WORLD instead?
+        // TODO: Should we maybe set this to RENDER_WORLD only instead?
         let mut render_mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD);
         render_mesh.insert_attribute(
             Mesh::ATTRIBUTE_POSITION,
@@ -99,7 +124,7 @@ pub fn update_chunk_meshes (
         );
         render_mesh.insert_attribute(
             Mesh::ATTRIBUTE_UV_0,
-            VertexAttributeValues::Float32x2(vec![[0.0; 2]; num_vertices]),
+            VertexAttributeValues::Float32x2(uvs),
         );
         render_mesh.insert_indices(Indices::U32(indices.clone()));
 
@@ -107,8 +132,8 @@ pub fn update_chunk_meshes (
 
         let mesh_handle = meshes.add(render_mesh.clone());
 
-        let mut material = StandardMaterial::from(Color::rgb(0.0, 0.0, 0.0));
-        material.perceptual_roughness = 0.9;
+        let mut material = StandardMaterial::from(Color::WHITE);
+        material.unlit = true;
         material.base_color_texture = Some(atlas.res_8x8.clone());
 
         // Some quads were generated.
