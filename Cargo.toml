@@ -11,6 +11,7 @@ bevy = "0.13"
 bevy_xpbd_3d = "0.4.2"
 moonshine-save = "0.3.5"
 leafwing-input-manager = "0.13"
+bevy_asset_loader = "0.20.0"
 # Other
 sark_grids = {path = "../!_Local-Plugins/sark_grids_rs"} #"0.5.8"
 #grid-tree = "0.2.0"

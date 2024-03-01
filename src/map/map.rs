@@ -125,6 +125,10 @@ impl Block {
         // TODO: Make the BlockData thing be tailored for the block we're making.
         Block {block_id, damage: 0, data: [BlockData::None]}
     }
+
+    pub fn get_attributes(self) -> BlockAttributes {
+        self.block_id.get_attributes()
+    }
 }
 
 #[derive(Default, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -137,11 +141,11 @@ pub enum BlockID {
 impl BlockID {
     fn get_attributes(self) -> BlockAttributes {
         match self {
-            BlockID::Air => BlockAttributes { health: 0, toughness: 0 },
-            BlockID::Dirt => BlockAttributes { health: 4, toughness: 0 },
-            BlockID::Stone => BlockAttributes { health: 6, toughness: 0 },
+            BlockID::Air => BlockAttributes { health: 0, ..default()  },
+            BlockID::Dirt => BlockAttributes { health: 4, ..default() },
+            BlockID::Stone => BlockAttributes { health: 6, ..default() },
             // Logs will have special behavior for how they get mined, most likely. (Treefelling)
-            BlockID::Log => BlockAttributes { health: 2, toughness: 0 },
+            BlockID::Log => BlockAttributes { health: 2, ..default() },
             
         }
     }
@@ -159,9 +163,37 @@ pub enum BlockData {
 }
 
 //TODO: Optimization: If we want to get *really* silly with optimization, we can combine everything here into a single unsigned, and start splitting bytes into nibbles
+#[derive(Default, Clone, Copy)]
 pub struct BlockAttributes {
     health: u8,
     toughness: u8,
+    tex_coords: TextureCoords,
+}
+/*
+impl BlockAttributes {
+    pub fn new(health: u8, toughness: u8, tex_coords: IVec2) -> BlockAttributes {
+        BlockAttributes { health, toughness, tex_coords }
+    }
+}
+ */
+
+// We might as well make this a struct instead of an enum, since it'll be the same size either way, and this will let us clarify what is what better.
+#[derive(Default, Clone, Copy)]
+pub struct TextureCoords {
+    top: IVec2,
+    bottom: IVec2,
+    north: IVec2,
+    south: IVec2,
+    east: IVec2,
+    west: IVec2,
+}
+impl TextureCoords {
+    pub fn symmetrical(coord: IVec2) -> TextureCoords {
+        TextureCoords { top: coord, bottom: coord, north: coord, south: coord, east: coord, west: coord }
+    }
+    pub fn assymetric_y(top: IVec2, bottom: IVec2, sides: IVec2) -> TextureCoords {
+        TextureCoords { top, bottom, north: sides, south: sides, east: sides, west: sides }
+    }
 }
 
 // Components

@@ -4,7 +4,7 @@ use bevy::render::render_asset::RenderAssetUsages;
 use bevy_xpbd_3d::components::RigidBody;
 use bevy_xpbd_3d::plugins::collision::{Collider, ColliderAabb};
 
-use crate::Chunk;
+use crate::{Atlas, Chunk, TextureAtlas};
 
 use block_mesh::ndshape::{ConstShape, ConstShape3u32};
 use block_mesh::{greedy_quads, visible_block_faces, GreedyQuadsBuffer, MergeVoxel, UnitQuadBuffer, Voxel, VoxelVisibility, RIGHT_HANDED_Y_UP_CONFIG};
@@ -43,6 +43,7 @@ pub fn update_chunk_meshes (
 
     query: Query<(Entity, &Chunk), Or<(Added<Chunk>, Changed<Chunk>)>>,
 
+    atlas: Res<Atlas>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
@@ -67,6 +68,9 @@ pub fn update_chunk_meshes (
             &faces,
             &mut buffer,
         );
+
+        println!("unitquadbuffer: {:?}", buffer.groups.clone());
+
         let num_indices = buffer.num_quads() * 6;
         let num_vertices = buffer.num_quads() * 4;
         let mut indices = Vec::with_capacity(num_indices);
@@ -79,6 +83,9 @@ pub fn update_chunk_meshes (
                 normals.extend_from_slice(&face.quad_mesh_normals());
             }
         }
+
+        println!("positions: {:?}", positions);
+        //println!("indices: {:?}", indices);
 
         // TODO: Should we maybe set this to RENDER_WORLD instead?
         let mut render_mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD);
@@ -102,6 +109,7 @@ pub fn update_chunk_meshes (
 
         let mut material = StandardMaterial::from(Color::rgb(0.0, 0.0, 0.0));
         material.perceptual_roughness = 0.9;
+        material.base_color_texture = Some(atlas.res_8x8.clone());
 
         // Some quads were generated.
         //assert!(buffer.num_quads() > 0);

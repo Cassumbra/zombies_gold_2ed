@@ -9,6 +9,7 @@
 #![feature(const_fn_floating_point_arithmetic)]
 
 use bevy::{app::AppExit, ecs::schedule::ScheduleLabel, pbr::wireframe::WireframePlugin, prelude::*, render::{settings::{RenderCreation, WgpuFeatures}, RenderPlugin}, window::{exit_on_all_closed, exit_on_primary_closed}};
+use bevy_asset_loader::prelude::*;
 //use bevy_flycam::PlayerPlugin;
 use bevy_xpbd_3d::{math::{Scalar, Vector}, prelude::*};
 use leafwing_input_manager::prelude::*;
@@ -79,6 +80,13 @@ pub enum PlayingState {
 }
  */
 
+ #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, States, ScheduleLabel, Default)]
+pub enum GameState {
+    #[default] AssetLoading,
+    //Setup,
+    Playing,
+}
+
 fn main () {
     App::new()
     //.insert_resource(WgpuOptions {
@@ -89,6 +97,13 @@ fn main () {
     .add_plugins(WireframePlugin)
     .add_plugins(PhysicsPlugins::default())
     .insert_resource(Msaa::Sample4)
+
+    .init_state::<GameState>()
+        .add_loading_state(
+            LoadingState::new(GameState::AssetLoading)
+                .continue_to_state(GameState::Playing)
+                .load_collection::<Atlas>(),
+        )
     /*
     .add_plugins(DefaultPlugins.set(RenderPlugin {
         render_creation: RenderCreation::Automatic(WgpuSettings {
@@ -111,10 +126,10 @@ fn main () {
 
     .init_resource::<RNGSeed>()
 
-    .add_systems(Startup, map::generate_small_map)
+    .add_systems(OnEnter(GameState::Playing), map::generate_small_map)
     .add_systems(Startup, setup)
 
-    .add_systems(Update, rendering::update_chunk_meshes)
+    .add_systems(Update, rendering::update_chunk_meshes.run_if(in_state(GameState::Playing)))
     .add_systems(Update, update_chunk_colliders)
     
     .add_systems(
@@ -138,6 +153,12 @@ fn main () {
     */
 
     .run();
+}
+
+#[derive(AssetCollection, Resource)]
+struct Atlas{
+    #[asset(path = "textures_8x8.png")]
+    pub res_8x8: Handle<Image>,
 }
 
 #[derive(Clone, Copy, Resource, Deref, DerefMut, Reflect)]
