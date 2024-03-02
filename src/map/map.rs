@@ -7,6 +7,7 @@ use noise::{Perlin, NoiseFn, Worley, core::worley::distance_functions::euclidean
 //use rand::{seq::SliceRandom, thread_rng};
 use derive_more::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign, };
 use bevy::{ecs::{entity::{EntityMapper, MapEntities}, reflect::ReflectMapEntities}, prelude::*};
+use crate::grid3::Grid3;
 
 use super::*;
 
