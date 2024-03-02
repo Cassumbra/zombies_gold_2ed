@@ -115,6 +115,10 @@ pub fn generate_small_map (
 }
 
 
+
+/// Denotes that an entity loads chunks around itself.
+//pub struct ChunkLoader
+
 // Data
 #[derive(Default, Clone, Deref, DerefMut, Component)]
 pub struct Chunk(Grid3<Block>);

@@ -132,6 +132,7 @@ pub fn update_chunk_meshes (
 
         let mesh_handle = meshes.add(render_mesh.clone());
 
+        // TODO: Should we be reusing this material instead of remaking it every time?
         let mut material = StandardMaterial::from(Color::WHITE);
         material.unlit = true;
         material.base_color_texture = Some(atlas.res_8x8.clone());

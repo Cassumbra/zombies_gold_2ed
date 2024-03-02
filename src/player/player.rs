@@ -4,6 +4,7 @@ use std::any::TypeId;
 use std::f32::consts::PI;
 
 use bevy::input::{ButtonState, keyboard::KeyboardInput};
+use bevy::window::{CursorGrabMode, PrimaryWindow};
 use bevy::{math, prelude::*};
 use bevy_xpbd_3d::components::LinearVelocity;
 use bevy_xpbd_3d::math::{Scalar, Vector2};
@@ -28,6 +29,8 @@ pub fn player_input_game (
     mut query: Query<(Entity, &ActionState<Action>, &mut Transform, &Children), (With<Player>)>,
     mut cam_query: Query<(&mut Transform), (Without<Player>)>,
     mut movement_event_writer: EventWriter<MovementAction>,
+
+    mut primary_window: Query<&mut Window, With<PrimaryWindow>>
 ) {
     // TODO: Perhaps we should send events for movement instead of moving directly?
     if let Ok((player, action_state, mut transform, children)) = query.get_single_mut() {
@@ -51,6 +54,39 @@ pub fn player_input_game (
             direction -= right;
         }
 
+        
+        if let Ok(mut window) = primary_window.get_single_mut() {
+            if action_state.just_pressed(&Action::MenuBack) {
+                window.cursor.grab_mode = CursorGrabMode::None;
+                window.cursor.visible = true;
+            }
+
+            if action_state.just_pressed(&Action::Primary) {
+                window.cursor.grab_mode = CursorGrabMode::Confined;
+                window.cursor.visible = false;
+            }
+
+            if window.cursor.grab_mode == CursorGrabMode::Confined {
+                if let Some(look) = action_state.axis_pair(&Action::Look) {
+                    // TODO: The sensitivity shouldn't be a magic number.
+                    transform.rotate_y(look.x() *  -0.001);
+                    // TODO: Maybe we should have some camera component or something for this? Or some better way to link things?
+                    for child in children.iter() {
+                        if let Ok(mut child_transform) = cam_query.get_mut(*child) {
+                            let mut rotation_x = child_transform.rotation.to_euler(EulerRot::XYZ).0 + look.y() * -0.001;
+                            rotation_x = rotation_x.clamp(-PI/2.0, PI/2.0);
+                            child_transform.rotation = Quat::from_axis_angle(Vec3::X, rotation_x);
+                            
+                            //child_transform.rotate_x(look.y() * -0.001);
+                            //child_transform.rotation.x = child_transform.rotation.x.clamp(-0.9, 0.9);
+                        }
+                    }
+                }
+            }
+            
+        }
+        
+
         //direction = direction.normalize_or_zero();
 
         if direction != Vec3::ZERO {
@@ -59,22 +95,6 @@ pub fn player_input_game (
 
         if action_state.pressed(&Action::Jump) {
             movement_event_writer.send(MovementAction::new(player, MovementType::Jump));
-        }
-
-        if let Some(look) = action_state.axis_pair(&Action::Look) {
-            // TODO: The sensitivity shouldn't be a magic number.
-            transform.rotate_y(look.x() *  -0.001);
-            // TODO: Maybe we should have some camera component or something for this? Or some better way to link things?
-            for child in children.iter() {
-                if let Ok(mut child_transform) = cam_query.get_mut(*child) {
-                    let mut rotation_x = child_transform.rotation.to_euler(EulerRot::XYZ).0 + look.y() * -0.001;
-                    rotation_x = rotation_x.clamp(-PI/2.0, PI/2.0);
-                    child_transform.rotation = Quat::from_axis_angle(Vec3::X, rotation_x);
-                    
-                    //child_transform.rotate_x(look.y() * -0.001);
-                    //child_transform.rotation.x = child_transform.rotation.x.clamp(-0.9, 0.9);
-                }
-            }
         }
     }   
 }

@@ -183,13 +183,15 @@ enum Action {
     MoveForward, MoveBackward,
     MoveLeft, MoveRight,
     Crouch, Jump,
-    Look,
+    Look, Primary,
+    MenuBack,
 }
 
-const INPUT_MAP: [(Action, InputKind); 7] = [(Action::MoveForward, InputKind::PhysicalKey(KeyCode::KeyW)), (Action::MoveBackward, InputKind::PhysicalKey(KeyCode::KeyS)),
+const INPUT_MAP: [(Action, InputKind); 9] = [(Action::MoveForward, InputKind::PhysicalKey(KeyCode::KeyW)), (Action::MoveBackward, InputKind::PhysicalKey(KeyCode::KeyS)),
                                             (Action::MoveLeft, InputKind::PhysicalKey(KeyCode::KeyA)), (Action::MoveRight, InputKind::PhysicalKey(KeyCode::KeyD)),
                                             (Action::Crouch, InputKind::PhysicalKey(KeyCode::ShiftLeft)), (Action::Jump, InputKind::PhysicalKey(KeyCode::Space)),
-                                            (Action::Look, InputKind::DualAxis(DualAxis::mouse_motion()))
+                                            (Action::Look, InputKind::DualAxis(DualAxis::mouse_motion())), (Action::Primary, InputKind::Mouse(MouseButton::Left)),
+                                            (Action::MenuBack, InputKind::PhysicalKey(KeyCode::Escape)),
                                           ];
 
 pub fn app_exit (mut events: EventReader<AppExit>) -> bool {
