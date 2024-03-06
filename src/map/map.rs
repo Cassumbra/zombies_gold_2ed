@@ -1,5 +1,5 @@
 use std::{cmp::{max, min}, ops::Index};
-use bevy::prelude::*;
+use bevy::{prelude::*, utils::HashMap};
 use fastrand::{Rng, choice};
 use sark_grids::Grid;
 //use grid_tree::OctreeU32;
@@ -7,9 +7,10 @@ use noise::{Perlin, NoiseFn, Worley, core::worley::distance_functions::euclidean
 //use rand::{seq::SliceRandom, thread_rng};
 use derive_more::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign, };
 use bevy::{ecs::{entity::{EntityMapper, MapEntities}, reflect::ReflectMapEntities}, prelude::*};
-use crate::grid3::Grid3;
+use crate::{grid3::Grid3, RNGSeed, CHUNK_SIZE};
 
-use super::*;
+use crate::sparse_grid3::SparseGrid3;
+
 
 const SEA_LEVEL: f64 = -0.0;
 
@@ -17,25 +18,29 @@ const SEA_LEVEL: f64 = -0.0;
 //Plugin
 #[derive(Default)]
 pub struct MapPlugin;
-/*
+
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
         app
+            .init_resource::<ChunkMap>();
     }
 }
- */
+ 
 
  // Systems
 pub fn generate_small_map (
     mut commands: Commands,
 
     seed: Res<RNGSeed>,
+    mut chunk_map: ResMut<ChunkMap>,
 
     //mut next_mapgen_state: ResMut<NextState<MapGenState>>,
 ) {
-    let width = 16;
-    let length = 16;
-    let height = 64;
+    //println!("generating a chunk!");
+
+    let width = CHUNK_SIZE;
+    let height = CHUNK_SIZE;
+    let length = CHUNK_SIZE;
 
     //let bundles = [TerrainType::DeepWater, TerrainType::ShallowWater,
     //               TerrainType::Plains, TerrainType::Hills, TerrainType::Mountains, TerrainType::Hills];
@@ -80,9 +85,9 @@ pub fn generate_small_map (
         //*altitude_val = noise_val;
         //println!("x: {}, y: {}, noise: {}", x, y, noise_val);
 
-        let surface_height = (((perlin_noise.get([perlin_x, perlin_y]) + 1.0) / 2.0) * (height as f64 / 4.0)) as i32;
-        for h in 0..=surface_height {
-            if h == surface_height {
+        let surface_height = (((perlin_noise.get([perlin_x, perlin_y]) + 1.0) / 2.0) * height as f64) as i32;
+        for h in 0..surface_height {
+            if h == surface_height - 1 {
                 *chunk.get_mut([position.x, h, position.y]).unwrap() = Block::new(BlockID::Grass);
             }
             else {
@@ -93,7 +98,8 @@ pub fn generate_small_map (
     }
 
     // TODO: Don't clone this.
-    commands.spawn(chunk.clone());
+    let chunk_entity = commands.spawn(chunk.clone()).id();
+    chunk_map.insert(IVec3::new(0, 0, 0), chunk_entity);
 
     /*
     for y in (0..height).rev() {
@@ -115,14 +121,50 @@ pub fn generate_small_map (
 }
 
 
+pub fn update_chunk_positions (
+    mut query: Query<(&GlobalTransform, &mut ChunkPosition, Option<&ChunkLoader>)>,
+) {
+    for (transform, mut position, opt_loader) in &mut query {
+        let new_position = (transform.translation() / CHUNK_SIZE as f32).as_ivec3();
+        
+        if let Some(loader) = opt_loader {
+            if **position != new_position {
+
+            }
+        }
+
+        **position = new_position;
+    }
+}
+
+#[derive(Default, Clone, Deref, DerefMut, Event)]
+pub struct LoadChunkEvent(IVec3);
+
+#[derive(Default, Clone, Deref, DerefMut, Resource)]
+pub struct ChunkMap(HashMap<IVec3, Entity>);
+
 
 /// Denotes that an entity loads chunks around itself.
-//pub struct ChunkLoader
+#[derive(Default, Clone, Deref, DerefMut, Component)]
+pub struct ChunkLoader{
+    pub range: i32,
+}
 
-// Data
+/// Required for chunkloading entities. May have other purposes later.
+#[derive(Default, Clone, Deref, DerefMut, Component)]
+pub struct ChunkPosition(IVec3);
+
+#[derive(Default, Clone, Deref, DerefMut, Component)]
+pub struct LoadReasonList(Vec<LoadReason>);
+
+#[derive(Copy, Clone)]
+pub enum LoadReason {
+    Loader(Entity),
+    Spawning(Entity), // TODO: Refactor to "move"? or "teleport"? not sure if we should
+}
+
 #[derive(Default, Clone, Deref, DerefMut, Component)]
 pub struct Chunk(Grid3<Block>);
-
 
 
 // TODO: Optimization: If we're using too much space, we can try and use u8s instead of enums. :)

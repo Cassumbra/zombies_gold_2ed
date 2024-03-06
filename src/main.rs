@@ -87,6 +87,9 @@ pub enum GameState {
     Playing,
 }
 
+const CHUNK_SIZE: i32 = 16;
+
+
 fn main () {
     App::new()
     //.insert_resource(WgpuOptions {
@@ -132,6 +135,7 @@ fn main () {
     //.add_plugins(PlayerPlugin)
 
     .add_plugins(ActionsPlugin)
+    .add_plugins(MapPlugin)
 
     .init_resource::<RNGSeed>()
 
@@ -140,6 +144,7 @@ fn main () {
 
     .add_systems(Update, rendering::update_chunk_meshes.run_if(in_state(GameState::Playing)))
     .add_systems(Update, update_chunk_colliders)
+    .add_systems(Update, move_to_spawn.run_if(in_state(GameState::Playing)))
     
     .add_systems(
         Update,
@@ -162,6 +167,38 @@ fn main () {
     */
 
     .run();
+}
+
+/// Indicates that an entity needs to be moved to a safe position near the origin or to their set spawn.
+#[derive(Clone, Copy, Component, Reflect)]
+pub struct MoveToSpawn;
+
+pub fn move_to_spawn (
+    mut query: Query<(Entity, &mut Transform), With<MoveToSpawn>>,
+    chunk_query: Query<(&Chunk)>,
+
+    chunk_map: Res<ChunkMap>,
+
+    mut commands: Commands,
+) {
+    //println!("time to move arounda!");
+    for (entity, mut transform) in &mut query {
+        if let Some(chunk_entity) = chunk_map.get(&IVec3::ZERO) {
+            if let Ok(chunk) = chunk_query.get(*chunk_entity) {
+                for (y, block) in chunk.iter_column(0, 0).enumerate().rev() {
+                    if block.block_id != BlockID::Air {
+                        println!("awa!!");
+                        transform.translation = Vec3::new(0.0 + 1.5, y as f32 + 1.5 + 2.0, 0.0 + 1.5);
+                        commands.entity(entity).remove::<MoveToSpawn>();
+                        break;
+                    }
+                }
+            }
+        }
+        else {
+            todo!("Need to add a load reason to the chunk if one does not already exist.");
+        }
+    }
 }
 
 #[derive(AssetCollection, Resource)]
@@ -276,6 +313,7 @@ pub fn setup(
         Restitution::ZERO.with_combine_rule(CoefficientCombine::Min),
         GravityScale(2.0),
         Player,
+        MoveToSpawn,
         InputManagerBundle::<Action> {
             // Stores "which actions are currently pressed"
             action_state: ActionState::default(),
@@ -286,22 +324,6 @@ pub fn setup(
         //GlobalTransform::default(),
     ))
     .add_child(camera);
-    
-
-
-    // Light
-    commands.spawn(PointLightBundle {
-        point_light: PointLight {
-            intensity: 2_000_000.0,
-            range: 50.0,
-            shadows_enabled: true,
-            ..default()
-        },
-        transform: Transform::from_xyz(0.0, 15.0, 0.0),
-        ..default()
-    });
-
-    
 }
 
 /*

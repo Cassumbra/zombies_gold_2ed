@@ -11,9 +11,9 @@
 //! # Example
 //!
 //! ```rust
-//! use sark_grids::sparse_grid::SparseGrid;
+//! use sark_grids::sparse_grid::SparseGrid3;
 //!
-//! let mut grid = SparseGrid::new([10,10]);
+//! let mut grid = SparseGrid3::new([10,10]);
 //!
 //! grid[4] = 'i';
 //! grid[[3,0]]= 'h';
@@ -40,13 +40,13 @@ use crate::{grid3::Side, point::{GridPoint, Size3d}};
 
 /// A sparse grid that stores elements in a [BTreeMap].
 #[derive(Default, Debug, Clone)]
-pub struct SparseGrid<T> {
+pub struct SparseGrid3<T> {
     data: BTreeMap<usize, T>,
     size: IVec3,
 }
 
-impl<T: Clone> SparseGrid<T> {
-    /// Creates a new [SparseGrid<T>].
+impl<T: Clone> SparseGrid3<T> {
+    /// Creates a new [SparseGrid3<T>].
     pub fn new(size: impl GridPoint) -> Self {
         Self {
             data: BTreeMap::new(),
@@ -324,7 +324,7 @@ impl<T: Clone> SparseGrid<T> {
     }
 }
 
-impl<T: Clone, P: GridPoint> Index<P> for SparseGrid<T> {
+impl<T: Clone, P: GridPoint> Index<P> for SparseGrid3<T> {
     type Output = T;
 
     fn index(&self, index: P) -> &Self::Output {
@@ -334,7 +334,7 @@ impl<T: Clone, P: GridPoint> Index<P> for SparseGrid<T> {
     }
 }
 
-impl<T: Clone, P: GridPoint> IndexMut<P> for SparseGrid<T>
+impl<T: Clone, P: GridPoint> IndexMut<P> for SparseGrid3<T>
 where
     T: Default,
 {
@@ -346,7 +346,7 @@ where
     }
 }
 
-impl<T: Clone> Index<usize> for SparseGrid<T> {
+impl<T: Clone> Index<usize> for SparseGrid3<T> {
     type Output = T;
 
     #[inline(always)]
@@ -354,7 +354,7 @@ impl<T: Clone> Index<usize> for SparseGrid<T> {
         &self.data[&index]
     }
 }
-impl<T: Clone> IndexMut<usize> for SparseGrid<T>
+impl<T: Clone> IndexMut<usize> for SparseGrid3<T>
 where
     T: Default,
 {
@@ -371,11 +371,11 @@ mod test {
 
     use crate::point::GridPoint;
 
-    use super::SparseGrid;
+    use super::SparseGrid3;
 
     #[test]
     fn index() {
-        let mut grid = SparseGrid::new([10, 17]);
+        let mut grid = SparseGrid3::new([10, 17]);
 
         let [x, y] = grid.transform_itl(5).as_array();
 
@@ -391,7 +391,7 @@ mod test {
 
     #[test]
     fn insert_row() {
-        let mut grid = SparseGrid::new([10, 10]);
+        let mut grid = SparseGrid3::new([10, 10]);
 
         grid.insert_row(5, "Hello".chars());
 
@@ -408,7 +408,7 @@ mod test {
 
     #[test]
     fn insert_row_at() {
-        let mut grid = SparseGrid::new([10, 10]);
+        let mut grid = SparseGrid3::new([10, 10]);
 
         grid.insert_row_at([3, 3], "Hello".chars());
 
@@ -429,7 +429,7 @@ mod test {
 
     #[test]
     fn insert_col() {
-        let mut grid = SparseGrid::new([10, 10]);
+        let mut grid = SparseGrid3::new([10, 10]);
 
         grid.insert_column(5, "Hello".chars());
 
@@ -446,7 +446,7 @@ mod test {
 
     #[test]
     fn insert_col_at() {
-        let mut grid = SparseGrid::new([10, 10]);
+        let mut grid = SparseGrid3::new([10, 10]);
 
         grid.insert_column_at([3, 3], "Hello".chars());
 
@@ -467,7 +467,7 @@ mod test {
 
     #[test]
     fn insert() {
-        let mut grid = SparseGrid::new([10, 10]);
+        let mut grid = SparseGrid3::new([10, 10]);
 
         grid[[0, 0]] = 'h';
         grid[[1, 3]] = '3';

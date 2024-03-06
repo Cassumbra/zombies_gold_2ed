@@ -4,7 +4,7 @@ use bevy::render::render_asset::RenderAssetUsages;
 use bevy_xpbd_3d::components::RigidBody;
 use bevy_xpbd_3d::plugins::collision::{Collider, ColliderAabb};
 
-use crate::{Atlas, Chunk, TextureAtlas};
+use crate::{Atlas, Chunk, TextureAtlas, CHUNK_SIZE};
 
 use block_mesh::ndshape::{ConstShape, ConstShape3u32};
 use block_mesh::{greedy_quads, visible_block_faces, GreedyQuadsBuffer, MergeVoxel, UnitQuadBuffer, UnorientedQuad, Voxel, VoxelVisibility, RIGHT_HANDED_Y_UP_CONFIG};
@@ -33,7 +33,7 @@ impl MergeVoxel for BoolVoxel {
     }
 }
 
-type ChunkShape = ConstShape3u32<18, 66, 18>;
+type ChunkShape = ConstShape3u32<18, 18, 18>;
 
 
 
@@ -64,7 +64,7 @@ pub fn update_chunk_meshes (
             &voxels,
             &ChunkShape {},
             [0; 3],
-            [17, 65, 17],
+            [CHUNK_SIZE as u32 + 1, CHUNK_SIZE as u32 + 1, CHUNK_SIZE as u32 + 1],
             &faces,
             &mut buffer,
         );

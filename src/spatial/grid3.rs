@@ -239,26 +239,28 @@ impl<T> Grid3<T> {
         let chunks = self.data[x..].chunks_mut(width);
         chunks.take(count)
     }
+     */
 
     /// An iterator over a single column of the grid.
     ///
     /// Goes from bottom to top.
     #[inline]
-    pub fn iter_column(&self, x: usize) -> impl DoubleEndedIterator<Item = &T> {
+    pub fn iter_column(&self, x: usize, z: usize) -> impl DoubleEndedIterator<Item = &T> + ExactSizeIterator  {
         let w = self.width();
-        return self.data[x..].iter().step_by(w);
+        let h = self.height();
+        return self.data[x + z * w * h..(x + (z + 1) * w * h).min(self.len())].iter().step_by(w);
     }
 
     /// A mutable iterator over a single column of the grid.
     ///
     /// Goes from bottom to top.
     #[inline]
-    pub fn iter_column_mut(&mut self, x: usize) -> impl DoubleEndedIterator<Item = &mut T> {
+    pub fn iter_column_mut(&mut self, x: usize, z: usize) -> impl DoubleEndedIterator<Item = &mut T> {
         let w = self.width();
-        return self.data[x..].iter_mut().step_by(w);
+        let h = self.height();
+        let length = self.len();
+        return self.data[x + z * w * h..(x + (z + 1) * w * h).min(length)].iter_mut().step_by(w);
     }
-
-     */
 
     /// Final index along a given axis, where 0 == width, and 1 == height.
     pub fn axis_index(&self, axis: usize) -> usize {
