@@ -188,7 +188,7 @@ pub fn move_to_spawn (
                 for (y, block) in chunk.iter_column(0, 0).enumerate().rev() {
                     if block.block_id != BlockID::Air {
                         println!("awa!!");
-                        transform.translation = Vec3::new(0.0 + 1.5, y as f32 + 1.5 + 2.0, 0.0 + 1.5);
+                        transform.translation = Vec3::new(0.0, y as f32 + 4.0, 0.0);
                         commands.entity(entity).remove::<MoveToSpawn>();
                         break;
                     }
@@ -245,7 +245,7 @@ pub fn update_chunk_colliders (
         // TODO: Optimize this. we don't need colliders if a block is touching air.
         let colliders: Vec::<(Vector, Quat, Collider)> = chunk.iter_3d().filter_map(|(position, block)| {
             if block.block_id != BlockID::Air {
-                Some((Vector::from(position.as_vec3() + Vec3::new(1.5, 1.5, 1.5)), Quat::IDENTITY, Collider::cuboid(1.0, 1.0, 1.0)))
+                Some((Vector::from(position.as_vec3()), Quat::IDENTITY, Collider::cuboid(1.0, 1.0, 1.0)))
             }
             else {
                 None
@@ -269,7 +269,7 @@ pub fn setup(
     assets: Res<AssetServer>,
 ) {
 
-    let height = 1.0;
+    let height = 1.8;
 
     // Emotional support cube. Uncomment when needed.
     /*
@@ -287,7 +287,7 @@ pub fn setup(
     
     // Camera
     let camera = commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(0.0, height * 0.8, 0.0),
+        transform: Transform::from_xyz(0.0, (height * 0.9) / 2.0, 0.0),
         ..default()
     })
     .id();

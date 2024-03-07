@@ -130,6 +130,8 @@ pub fn update_chunk_meshes (
 
         //println!("{:?}", render_mesh);
 
+        render_mesh.translate_by(Vec3::new(-1.5, -1.5, -1.5));
+
         let mesh_handle = meshes.add(render_mesh.clone());
 
         // TODO: Should we be reusing this material instead of remaking it every time?
@@ -147,13 +149,10 @@ pub fn update_chunk_meshes (
 
             //visibility: Visibility::Visible,
             //inherited_visibility: InheritedVisibility::VISIBLE,
-            
+
             ..default()
             /*
-            transform: todo!(),
             global_transform: todo!(),
-            visibility: todo!(),
-            inherited_visibility: todo!(),
             view_visibility: todo!(),
              */
         });
