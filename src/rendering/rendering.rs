@@ -143,6 +143,8 @@ pub fn update_chunk_meshes (
         //assert!(buffer.num_quads() > 0);
         //println!("quads: {}", buffer.num_quads());
 
+        // TODO: Use insert_unique to insert a PbrBundle once insert_unique is available.
+        /*
         commands.entity(entity).insert(PbrBundle{
             mesh: mesh_handle,
             material: materials.add(material),
@@ -156,5 +158,12 @@ pub fn update_chunk_meshes (
             view_visibility: todo!(),
              */
         });
+        */
+        commands.entity(entity)
+            .insert(mesh_handle)
+            .insert(materials.add(material))
+            .insert(Visibility::default())
+            .insert(InheritedVisibility::default())
+            .insert(ViewVisibility::default());
     }
 }

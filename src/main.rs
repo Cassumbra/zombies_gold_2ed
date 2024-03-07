@@ -139,7 +139,7 @@ fn main () {
 
     .init_resource::<RNGSeed>()
 
-    .add_systems(OnEnter(GameState::Playing), map::generate_small_map)
+    .add_systems(Update, map::generate_chunks)
     .add_systems(Startup, setup)
 
     .add_systems(Update, rendering::update_chunk_meshes.run_if(in_state(GameState::Playing)))
@@ -173,6 +173,8 @@ fn main () {
 #[derive(Clone, Copy, Component, Reflect)]
 pub struct MoveToSpawn;
 
+const SPAWN_CHUNK: IVec3 = IVec3::new(5, 0, 0);
+
 pub fn move_to_spawn (
     mut query: Query<(Entity, &mut Transform), With<MoveToSpawn>>,
     chunk_query: Query<(&Chunk)>,
@@ -180,23 +182,26 @@ pub fn move_to_spawn (
     chunk_map: Res<ChunkMap>,
 
     mut commands: Commands,
+
+    mut evw_load_chunk: EventWriter<LoadChunkEvent>,
 ) {
     //println!("time to move arounda!");
-    for (entity, mut transform) in &mut query {
-        if let Some(chunk_entity) = chunk_map.get(&IVec3::ZERO) {
+    'entity_checks: for (entity, mut transform) in &mut query {
+        if let Some(chunk_entity) = chunk_map.get(&SPAWN_CHUNK) {
             if let Ok(chunk) = chunk_query.get(*chunk_entity) {
                 for (y, block) in chunk.iter_column(0, 0).enumerate().rev() {
                     if block.block_id != BlockID::Air {
-                        println!("awa!!");
-                        transform.translation = Vec3::new(0.0, y as f32 + 4.0, 0.0);
+                        transform.translation = IVec3::new(SPAWN_CHUNK.x * CHUNK_SIZE, SPAWN_CHUNK.y * CHUNK_SIZE + y as i32 + 4, SPAWN_CHUNK.z * CHUNK_SIZE).as_vec3();
+                        println!("translation: {}", transform.translation);
                         commands.entity(entity).remove::<MoveToSpawn>();
-                        break;
+                        continue 'entity_checks
                     }
                 }
+                todo!("We need to try some other spawn locations!");
             }
         }
         else {
-            todo!("Need to add a load reason to the chunk if one does not already exist.");
+            evw_load_chunk.send(LoadChunkEvent { chunk: SPAWN_CHUNK, load_reason: LoadReason::Spawning(entity) });
         }
     }
 }

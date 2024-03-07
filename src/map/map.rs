@@ -22,29 +22,23 @@ pub struct MapPlugin;
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
         app
-            .init_resource::<ChunkMap>();
+            .init_resource::<ChunkMap>()
+            .add_event::<LoadChunkEvent>();
     }
 }
  
 
  // Systems
-pub fn generate_small_map (
+pub fn generate_chunks (
     mut commands: Commands,
 
     seed: Res<RNGSeed>,
     mut chunk_map: ResMut<ChunkMap>,
 
+    mut evr_load_chunk: EventReader<LoadChunkEvent>,
+
     //mut next_mapgen_state: ResMut<NextState<MapGenState>>,
 ) {
-    //println!("generating a chunk!");
-
-    let width = CHUNK_SIZE;
-    let height = CHUNK_SIZE;
-    let length = CHUNK_SIZE;
-
-    //let bundles = [TerrainType::DeepWater, TerrainType::ShallowWater,
-    //               TerrainType::Plains, TerrainType::Hills, TerrainType::Mountains, TerrainType::Hills];
-
     //let mut ranges = ranges_from_weights(&water_weights, [-1.0, SEA_LEVEL]);
     //ranges.append(&mut ranges_from_weights(&land_weights, [SEA_LEVEL, 1.0]));
 
@@ -56,67 +50,62 @@ pub fn generate_small_map (
     let worley_scaling = 10.0;
     let perlin_scaling = 0.1;
 
-    let mut altitude_grid: Grid::<f64> = Grid::<f64>::new([width, length]);
-    let mut chunk = Chunk(Grid3::filled(Block::new(BlockID::Air), [width, height, length]));
-
-    // Set initial values
-    for (position, altitude_val) in altitude_grid.iter_2d_mut() {
-        let point_x = (position.x as f64); // / (width as f64);
-        let point_y = (position.y as f64); // / (length as f64);
-        
-        //let worley_x = point_x * worley_scaling;
-        //let worley_y = point_y * worley_scaling;
-        
-        let perlin_x = point_x * perlin_scaling;
-        let perlin_y = point_y * perlin_scaling;
-        
-        //let worley_noise_val = (worley_noise.get([worley_x, worley_y]) + SEA_LEVEL + 1.0 ) / 2.0; // clamp seems to provide uninteresting results. add 1 instead.
-        //let perlin_noise_val = create_averaged_noise(point_x, point_y, vec![2.0, 5.0], vec![2.0, 1.0], &perlin_noise);
-        //let perlin_noise_val_islands = (perlin_noise.get([perlin_x, perlin_y]) + SEA_LEVEL + 1.0) / 4.0;
-
-        //let noise_val = perlin_noise_val + 
-        //if perlin_noise_val > SEA_LEVEL 
-        //    {worley_noise_val} 
-        //else if perlin_noise_val < SEA_LEVEL - 0.25 
-        //    {perlin_noise_val_islands}  
-        //else 
-        //    {0.0};
-
-        //*altitude_val = noise_val;
-        //println!("x: {}, y: {}, noise: {}", x, y, noise_val);
-
-        let surface_height = (((perlin_noise.get([perlin_x, perlin_y]) + 1.0) / 2.0) * height as f64) as i32;
-        for h in 0..surface_height {
-            if h == surface_height - 1 {
-                *chunk.get_mut([position.x, h, position.y]).unwrap() = Block::new(BlockID::Grass);
-            }
-            else {
-                *chunk.get_mut([position.x, h, position.y]).unwrap() = Block::new(BlockID::Dirt);
-            }
-            
+    for ev in evr_load_chunk.read() {
+        println!("wiggledog");
+        if chunk_map.contains_key(&ev.chunk) {
+            continue
         }
-    }
 
-    // TODO: Don't clone this.
-    let chunk_entity = commands.spawn(chunk.clone()).id();
-    chunk_map.insert(IVec3::new(0, 0, 0), chunk_entity);
-
-    /*
-    for y in (0..height).rev() {
-        for x in 0..width {
-            let block_id = chunk.get([x, y, 0]).unwrap().block_id;
-            if block_id == BlockID::Air {
-                print!(" ");
-            }
-            else {
-                print!("#");
-            }
-            //println!("{:?}", chunk.get([x, y, 0]).unwrap().block_id);
-        }
-        println!("");
-    }
-    */
+        let mut altitude_grid: Grid::<f64> = Grid::<f64>::new([CHUNK_SIZE, CHUNK_SIZE]);
+        let mut chunk = Chunk(Grid3::filled(Block::new(BlockID::Air), [CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE]));
     
+        let offset = ev.chunk * CHUNK_SIZE;
+
+        // Set initial values
+        for (position, altitude_val) in altitude_grid.iter_2d_mut() {
+            let point_x = (offset.x + position.x) as f64; // / (width as f64);
+            let point_y = (offset.z + position.y) as f64; // / (length as f64);
+            
+            //let worley_x = point_x * worley_scaling;
+            //let worley_y = point_y * worley_scaling;
+            
+            let perlin_x = point_x * perlin_scaling;
+            let perlin_y = point_y * perlin_scaling;
+            
+            //let worley_noise_val = (worley_noise.get([worley_x, worley_y]) + SEA_LEVEL + 1.0 ) / 2.0; // clamp seems to provide uninteresting results. add 1 instead.
+            //let perlin_noise_val = create_averaged_noise(point_x, point_y, vec![2.0, 5.0], vec![2.0, 1.0], &perlin_noise);
+            //let perlin_noise_val_islands = (perlin_noise.get([perlin_x, perlin_y]) + SEA_LEVEL + 1.0) / 4.0;
+    
+            //let noise_val = perlin_noise_val + 
+            //if perlin_noise_val > SEA_LEVEL 
+            //    {worley_noise_val} 
+            //else if perlin_noise_val < SEA_LEVEL - 0.25 
+            //    {perlin_noise_val_islands}  
+            //else 
+            //    {0.0};
+    
+            //*altitude_val = noise_val;
+            //println!("x: {}, y: {}, noise: {}", x, y, noise_val);
+    
+            let surface_height = (((perlin_noise.get([perlin_x, perlin_y]) + 1.0) / 2.0) * CHUNK_SIZE as f64) as i32;
+            for h in 0..surface_height {
+                if h == surface_height - 1 {
+                    *chunk.get_mut([position.x, h, position.y]).unwrap() = Block::new(BlockID::Grass);
+                }
+                else {
+                    *chunk.get_mut([position.x, h, position.y]).unwrap() = Block::new(BlockID::Dirt);
+                }
+                
+            }
+        }
+        
+        let chunk_entity = commands.spawn(chunk)
+            .insert(LoadReasonList(vec![ev.load_reason]))
+            .insert(Transform::from_translation((ev.chunk * CHUNK_SIZE).as_vec3()))
+            .insert(GlobalTransform::default())
+            .id();
+        chunk_map.insert(ev.chunk, chunk_entity);
+    }
     //next_mapgen_state.set(MapGenState::TempBand);
 }
 
@@ -137,17 +126,21 @@ pub fn update_chunk_positions (
     }
 }
 
-#[derive(Default, Clone, Deref, DerefMut, Event)]
-pub struct LoadChunkEvent(IVec3);
+#[derive(Clone, Event)]
+pub struct LoadChunkEvent {
+    pub chunk: IVec3,
+    pub load_reason: LoadReason,
+}
 
 #[derive(Default, Clone, Deref, DerefMut, Resource)]
 pub struct ChunkMap(HashMap<IVec3, Entity>);
 
 
 /// Denotes that an entity loads chunks around itself.
-#[derive(Default, Clone, Deref, DerefMut, Component)]
+#[derive(Default, Clone, Component)]
 pub struct ChunkLoader{
     pub range: i32,
+    pub load_list: Vec<Entity>,
 }
 
 /// Required for chunkloading entities. May have other purposes later.
