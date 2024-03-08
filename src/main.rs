@@ -179,7 +179,7 @@ fn main () {
 #[derive(Clone, Copy, Component, Reflect)]
 pub struct MoveToSpawn;
 
-const SPAWN_CHUNK: IVec3 = IVec3::new(5, 0, 0);
+const SPAWN_CHUNK: IVec3 = IVec3::new(1, 0, 0);
 
 pub fn move_to_spawn (
     mut query: Query<(Entity, &mut Transform), With<MoveToSpawn>>,
@@ -264,9 +264,11 @@ pub fn update_chunk_colliders (
         
         }).collect();
 
-        commands.entity(entity)
-        .insert(Collider::compound(colliders))
-        .insert(RigidBody::Static);
+        if !colliders.is_empty() {
+            commands.entity(entity)
+            .insert(Collider::compound(colliders))
+            .insert(RigidBody::Static);
+        }
     }
 }
 

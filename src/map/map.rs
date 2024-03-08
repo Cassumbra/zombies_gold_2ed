@@ -52,6 +52,7 @@ pub fn generate_chunks (
 
     let worley_scaling = 10.0;
     let perlin_scaling = 0.025;
+    let y_perlin_scaling = 0.025;
 
     for ev in evr_load_chunk.read() {
         if let Some(chunk_entity) = chunk_map.get(&ev.chunk) {
@@ -60,21 +61,22 @@ pub fn generate_chunks (
             }
         }
 
-        let mut altitude_grid: Grid::<f64> = Grid::<f64>::new([CHUNK_SIZE, CHUNK_SIZE]);
         let mut chunk = Chunk(Grid3::filled(Block::new(BlockID::Air), [CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE]));
     
         let offset = ev.chunk * CHUNK_SIZE;
 
         // Set initial values
-        for (position, altitude_val) in altitude_grid.iter_2d_mut() {
+        for (position, block_val) in chunk.iter_3d_mut() {
             let point_x = (offset.x + position.x) as f64; // / (width as f64);
-            let point_y = (offset.z + position.y) as f64; // / (length as f64);
+            let point_y = (offset.y + position.y) as f64;
+            let point_z = (offset.z + position.z) as f64; // / (length as f64);
             
             //let worley_x = point_x * worley_scaling;
             //let worley_y = point_y * worley_scaling;
             
             let perlin_x = point_x * perlin_scaling;
-            let perlin_y = point_y * perlin_scaling;
+            let perlin_y = point_y * y_perlin_scaling;
+            let perlin_z = point_z * perlin_scaling;
             
             //let worley_noise_val = (worley_noise.get([worley_x, worley_y]) + SEA_LEVEL + 1.0 ) / 2.0; // clamp seems to provide uninteresting results. add 1 instead.
             //let perlin_noise_val = create_averaged_noise(point_x, point_y, vec![2.0, 5.0], vec![2.0, 1.0], &perlin_noise);
@@ -91,16 +93,22 @@ pub fn generate_chunks (
             //*altitude_val = noise_val;
             //println!("x: {}, y: {}, noise: {}", x, y, noise_val);
     
-            let surface_height = (((perlin_noise.get([perlin_x, perlin_y]) + 1.0) / 2.0) * CHUNK_SIZE as f64) as i32;
+            let noise_val = perlin_noise.get([perlin_x, perlin_y, perlin_z]);
+            //println!("noise val: {}", noise_val);
+            if noise_val > 0.0 {
+                *block_val = Block::new(BlockID::Dirt);
+            }
+            /*
             for h in 0..surface_height {
                 if h == surface_height - 1 {
-                    *chunk.get_mut([position.x, h, position.y]).unwrap() = Block::new(BlockID::Grass);
+                    *block_val = Block::new(BlockID::Grass);
                 }
                 else {
-                    *chunk.get_mut([position.x, h, position.y]).unwrap() = Block::new(BlockID::Dirt);
+                    *block_val = Block::new(BlockID::Dirt);
                 }
                 
             }
+             */
         }
         
         let chunk_entity = commands.spawn(chunk)
@@ -180,9 +188,9 @@ pub fn update_chunk_loaders (
         let max_corner = **position + loader.range;
         let min_corner_buffered = min_corner - buffer_range;
         let max_corner_buffered = max_corner + buffer_range;
-        let y = 0;
+        //let y = 0;
         for x in min_corner_buffered.x..=max_corner_buffered.x {
-            //for y in min_corner_buffered.y..=max_corner_buffered.y {
+            for y in min_corner_buffered.y..=max_corner_buffered.y {
                 for z in min_corner_buffered.z..=max_corner_buffered.z {
                     let mut load_success = false;
 
@@ -203,7 +211,7 @@ pub fn update_chunk_loaders (
                         evw_load_chunk.send(LoadChunkEvent { chunk: IVec3::new(x, y, z), load_reason: LoadReason::Loader(entity) });
                     }
                 }
-            //}
+            }
         }
 
     }
