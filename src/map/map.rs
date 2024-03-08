@@ -3,7 +3,7 @@ use bevy::{prelude::*, utils::{HashMap, HashSet}};
 use fastrand::{Rng, choice};
 use sark_grids::Grid;
 //use grid_tree::OctreeU32;
-use noise::{Perlin, NoiseFn, Worley, core::worley::distance_functions::euclidean_squared};
+use noise::{core::worley::distance_functions::euclidean_squared, NoiseFn, Perlin, ScalePoint, Worley};
 //use rand::{seq::SliceRandom, thread_rng};
 use derive_more::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign, };
 use bevy::{ecs::{entity::{EntityMapper, MapEntities}, reflect::ReflectMapEntities}, prelude::*};
@@ -42,17 +42,8 @@ pub fn generate_chunks (
 
     //mut next_mapgen_state: ResMut<NextState<MapGenState>>,
 ) {
-    //let mut ranges = ranges_from_weights(&water_weights, [-1.0, SEA_LEVEL]);
-    //ranges.append(&mut ranges_from_weights(&land_weights, [SEA_LEVEL, 1.0]));
-
-    //let mut worley_noise = Worley::new(**seed);
-    //worley_noise = worley_noise.set_distance_function(euclidean_squared);
-    //worley_noise = worley_noise.set_return_type(noise::core::worley::ReturnType::Distance);
     let perlin_noise = Perlin::new(**seed);
-
-    let worley_scaling = 10.0;
-    let perlin_scaling = 0.025;
-    let y_perlin_scaling = 0.025;
+    let noise_gen = ScalePoint::new(perlin_noise).set_all_scales(0.025, 0.025, 0.025, 1.0);
 
     for ev in evr_load_chunk.read() {
         if let Some(chunk_entity) = chunk_map.get(&ev.chunk) {
@@ -67,51 +58,18 @@ pub fn generate_chunks (
 
         // Set initial values
         for (position, block_val) in chunk.iter_3d_mut() {
-            let point_x = (offset.x + position.x) as f64; // / (width as f64);
+            let point_x = (offset.x + position.x) as f64;
             let point_y = (offset.y + position.y) as f64;
-            let point_z = (offset.z + position.z) as f64; // / (length as f64);
-            
-            //let worley_x = point_x * worley_scaling;
-            //let worley_y = point_y * worley_scaling;
-            
-            let perlin_x = point_x * perlin_scaling;
-            let perlin_y = point_y * y_perlin_scaling;
-            let perlin_z = point_z * perlin_scaling;
-
-            //let worley_noise_val = (worley_noise.get([worley_x, worley_y]) + SEA_LEVEL + 1.0 ) / 2.0; // clamp seems to provide uninteresting results. add 1 instead.
-            //let perlin_noise_val = create_averaged_noise(point_x, point_y, vec![2.0, 5.0], vec![2.0, 1.0], &perlin_noise);
-            //let perlin_noise_val_islands = (perlin_noise.get([perlin_x, perlin_y]) + SEA_LEVEL + 1.0) / 4.0;
+            let point_z = (offset.z + position.z) as f64;
     
-            //let noise_val = perlin_noise_val + 
-            //if perlin_noise_val > SEA_LEVEL 
-            //    {worley_noise_val} 
-            //else if perlin_noise_val < SEA_LEVEL - 0.25 
-            //    {perlin_noise_val_islands}  
-            //else 
-            //    {0.0};
-    
-            //*altitude_val = noise_val;
-            //println!("x: {}, y: {}, noise: {}", x, y, noise_val);
-    
-            let noise_val = perlin_noise.get([perlin_x, perlin_y, perlin_z]);
+            let noise_val = noise_gen.get([point_x, point_y, point_z]);
             if noise_val >= 0.0 {
                 *block_val = Block::new(BlockID::Dirt);
                 // Make our block grass instead of dirt if the block above is air.
-                if perlin_noise.get([perlin_x, perlin_y + y_perlin_scaling, perlin_z]) < 0.0 {
+                if noise_gen.get([point_x, point_y + 1.0, point_z]) < 0.0 {
                     *block_val = Block::new(BlockID::Grass);
                 }
             }
-            /*
-            for h in 0..surface_height {
-                if h == surface_height - 1 {
-                    *block_val = Block::new(BlockID::Grass);
-                }
-                else {
-                    *block_val = Block::new(BlockID::Dirt);
-                }
-                
-            }
-             */
         }
         
         let chunk_entity = commands.spawn(chunk)
@@ -128,6 +86,7 @@ pub fn generate_chunks (
             loader.load_list.push(chunk_entity);
         }
     }
+    
     //next_mapgen_state.set(MapGenState::TempBand);
 }
 
