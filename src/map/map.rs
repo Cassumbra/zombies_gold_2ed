@@ -77,7 +77,7 @@ pub fn generate_chunks (
             let perlin_x = point_x * perlin_scaling;
             let perlin_y = point_y * y_perlin_scaling;
             let perlin_z = point_z * perlin_scaling;
-            
+
             //let worley_noise_val = (worley_noise.get([worley_x, worley_y]) + SEA_LEVEL + 1.0 ) / 2.0; // clamp seems to provide uninteresting results. add 1 instead.
             //let perlin_noise_val = create_averaged_noise(point_x, point_y, vec![2.0, 5.0], vec![2.0, 1.0], &perlin_noise);
             //let perlin_noise_val_islands = (perlin_noise.get([perlin_x, perlin_y]) + SEA_LEVEL + 1.0) / 4.0;
@@ -94,9 +94,12 @@ pub fn generate_chunks (
             //println!("x: {}, y: {}, noise: {}", x, y, noise_val);
     
             let noise_val = perlin_noise.get([perlin_x, perlin_y, perlin_z]);
-            //println!("noise val: {}", noise_val);
-            if noise_val > 0.0 {
+            if noise_val >= 0.0 {
                 *block_val = Block::new(BlockID::Dirt);
+                // Make our block grass instead of dirt if the block above is air.
+                if perlin_noise.get([perlin_x, perlin_y + y_perlin_scaling, perlin_z]) < 0.0 {
+                    *block_val = Block::new(BlockID::Grass);
+                }
             }
             /*
             for h in 0..surface_height {
