@@ -1,4 +1,4 @@
-use std::{cmp::{max, min}, ops::Index};
+use std::{cmp::{max, min}, ops::{Index, RangeBounds}};
 use bevy::{prelude::*, utils::{HashMap, HashSet}};
 use fastrand::{Rng, choice};
 use sark_grids::Grid;
@@ -37,6 +37,9 @@ pub fn generate_chunks (
 
     mut evr_load_chunk: EventReader<LoadChunkEvent>,
 
+    mut loader_query: Query<(&mut ChunkLoader)>,
+
+
     //mut next_mapgen_state: ResMut<NextState<MapGenState>>,
 ) {
     //let mut ranges = ranges_from_weights(&water_weights, [-1.0, SEA_LEVEL]);
@@ -51,9 +54,10 @@ pub fn generate_chunks (
     let perlin_scaling = 0.025;
 
     for ev in evr_load_chunk.read() {
-        //println!("wiggledog");
-        if chunk_map.contains_key(&ev.chunk) {
-            continue
+        if let Some(chunk_entity) = chunk_map.get(&ev.chunk) {
+            if commands.get_entity(*chunk_entity).is_some() {
+                continue
+            }
         }
 
         let mut altitude_grid: Grid::<f64> = Grid::<f64>::new([CHUNK_SIZE, CHUNK_SIZE]);
@@ -105,8 +109,32 @@ pub fn generate_chunks (
             .insert(GlobalTransform::default())
             .id();
         chunk_map.insert(ev.chunk, chunk_entity);
+        let loader_entity = match ev.load_reason {
+            LoadReason::Loader(entity) => entity,
+            LoadReason::Spawning(entity) => entity,
+        };
+        if let Ok(mut loader) = loader_query.get_mut(loader_entity) {
+            loader.load_list.push(chunk_entity);
+        }
     }
     //next_mapgen_state.set(MapGenState::TempBand);
+}
+
+pub fn unload_chunks (
+    mut commands: Commands,
+
+    //mut chunk_map: ResMut<ChunkMap>,
+
+    chunk_query: Query<(Entity, &LoadReasonList), Changed<LoadReasonList>>,
+) {
+    for (chunk_entity, load_reason_list) in &chunk_query {
+        //println!("load reasons: {:?}", **load_reason_list);
+        if load_reason_list.is_empty() {
+            commands.entity(chunk_entity).despawn();
+            // TODO: The fact that we don't remove the entity from the chunk_map means we have to test to see if the entity in the map is actually valid in a lot of different places.
+            //       This kinda sucks, and we should probably fix it!
+        }
+    }
 }
 
 
@@ -128,12 +156,15 @@ pub fn update_chunk_loaders (
     mut query: Query<(Entity, &ChunkPosition, &mut ChunkLoader), (Changed<ChunkPosition>)>,
     mut chunk_query: Query<(&mut LoadReasonList)>,
 
-    mut chunk_map: ResMut<ChunkMap>,
+    chunk_map: Res<ChunkMap>,
 
-    mut commands: Commands,
+    //mut commands: Commands,
 
     mut evw_load_chunk: EventWriter<LoadChunkEvent>,
 ) {
+    // TODO: Not sure if "buffer" is the right word. Also, maybe this should be an attribute of the ChunkLoader type? Or maybe a const?
+    let buffer_range = 1;
+
     for (entity, position, mut loader) in &mut query {
         // Reset whatever it is we're currently loading.
         // TODO: We should be selectively removing things, maybe. and then we can use range + n for the area where we wont load/generate chunks, but we'll still keep chunks already loaded/generated loaded.
@@ -147,10 +178,14 @@ pub fn update_chunk_loaders (
         // Load everything in our range.
         let min_corner = **position - loader.range;
         let max_corner = **position + loader.range;
+        let min_corner_buffered = min_corner - buffer_range;
+        let max_corner_buffered = max_corner + buffer_range;
         let y = 0;
-        for x in min_corner.x..=max_corner.x {
-            //for y in min_corner.y..=max_corner.y {
-                for z in min_corner.z..=max_corner.z {
+        for x in min_corner_buffered.x..=max_corner_buffered.x {
+            //for y in min_corner_buffered.y..=max_corner_buffered.y {
+                for z in min_corner_buffered.z..=max_corner_buffered.z {
+                    let mut load_success = false;
+
                     if let Some(chunk_entity) = chunk_map.get(&IVec3::new(x, y, z)) {
                         if let Ok(mut load_reason_list) = chunk_query.get_mut(*chunk_entity) {
                             // Try to remove this. Just in case.
@@ -158,9 +193,13 @@ pub fn update_chunk_loaders (
 
                             load_reason_list.insert(LoadReason::Loader(entity));
 
+                            loader.load_list.push(*chunk_entity);
+
+                            load_success = true;
                         }
                     }
-                    else {
+                    // We keep everything in the range and the buffer range loaded, but we only *start* loading if chunks are in the load range proper.
+                    if !load_success && (min_corner.x..=max_corner.x).contains(&x) && (min_corner.y..=max_corner.y).contains(&y) && (min_corner.z..=max_corner.z).contains(&z) {
                         evw_load_chunk.send(LoadChunkEvent { chunk: IVec3::new(x, y, z), load_reason: LoadReason::Loader(entity) });
                     }
                 }
@@ -191,10 +230,10 @@ pub struct ChunkLoader{
 #[derive(Default, Clone, Deref, DerefMut, Component)]
 pub struct ChunkPosition(IVec3);
 
-#[derive(Default, Clone, Deref, DerefMut, Component)]
+#[derive(Default, Clone, Deref, DerefMut, Component, Debug)]
 pub struct LoadReasonList(HashSet<LoadReason>);
 
-#[derive(Copy, Clone, Eq, Hash, PartialEq)]
+#[derive(Copy, Clone, Eq, Hash, PartialEq, Debug)]
 pub enum LoadReason {
     Loader(Entity),
     Spawning(Entity), // TODO: Refactor to "move"? or "teleport"? not sure if we should

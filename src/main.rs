@@ -145,6 +145,7 @@ fn main () {
     .add_systems(Update, map::update_chunk_positions)
     .add_systems(Update, map::update_chunk_loaders)
     .add_systems(Update, map::generate_chunks)
+    .add_systems(Update, map::unload_chunks)
 
     .add_systems(Update, rendering::update_chunk_meshes.run_if(in_state(GameState::Playing)))
     .add_systems(Update, update_chunk_colliders)
@@ -205,9 +206,8 @@ pub fn move_to_spawn (
                 todo!("We need to try some other spawn locations!");
             }
         }
-        else {
-            evw_load_chunk.send(LoadChunkEvent { chunk: SPAWN_CHUNK, load_reason: LoadReason::Spawning(entity) });
-        }
+
+        evw_load_chunk.send(LoadChunkEvent { chunk: SPAWN_CHUNK, load_reason: LoadReason::Spawning(entity) });
     }
 }
 
