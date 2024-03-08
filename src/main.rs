@@ -139,12 +139,17 @@ fn main () {
 
     .init_resource::<RNGSeed>()
 
-    .add_systems(Update, map::generate_chunks)
+    
     .add_systems(Startup, setup)
+
+    .add_systems(Update, map::update_chunk_positions)
+    .add_systems(Update, map::update_chunk_loaders)
+    .add_systems(Update, map::generate_chunks)
 
     .add_systems(Update, rendering::update_chunk_meshes.run_if(in_state(GameState::Playing)))
     .add_systems(Update, update_chunk_colliders)
     .add_systems(Update, move_to_spawn.run_if(in_state(GameState::Playing)))
+    
     
     .add_systems(
         Update,
@@ -327,6 +332,8 @@ pub fn setup(
         },
         //Transform::default(),
         //GlobalTransform::default(),
+        ChunkPosition::default(),
+        ChunkLoader { range: 2, load_list: vec![] }
     ))
     .add_child(camera);
 }

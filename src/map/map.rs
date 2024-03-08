@@ -1,5 +1,5 @@
 use std::{cmp::{max, min}, ops::Index};
-use bevy::{prelude::*, utils::HashMap};
+use bevy::{prelude::*, utils::{HashMap, HashSet}};
 use fastrand::{Rng, choice};
 use sark_grids::Grid;
 //use grid_tree::OctreeU32;
@@ -48,10 +48,10 @@ pub fn generate_chunks (
     let perlin_noise = Perlin::new(**seed);
 
     let worley_scaling = 10.0;
-    let perlin_scaling = 0.1;
+    let perlin_scaling = 0.025;
 
     for ev in evr_load_chunk.read() {
-        println!("wiggledog");
+        //println!("wiggledog");
         if chunk_map.contains_key(&ev.chunk) {
             continue
         }
@@ -100,7 +100,7 @@ pub fn generate_chunks (
         }
         
         let chunk_entity = commands.spawn(chunk)
-            .insert(LoadReasonList(vec![ev.load_reason]))
+            .insert(LoadReasonList(HashSet::from([ev.load_reason])))
             .insert(Transform::from_translation((ev.chunk * CHUNK_SIZE).as_vec3()))
             .insert(GlobalTransform::default())
             .id();
@@ -111,18 +111,62 @@ pub fn generate_chunks (
 
 
 pub fn update_chunk_positions (
-    mut query: Query<(&GlobalTransform, &mut ChunkPosition, Option<&ChunkLoader>)>,
+    mut query: Query<(&GlobalTransform, &mut ChunkPosition), (Changed<GlobalTransform>)>,
 ) {
-    for (transform, mut position, opt_loader) in &mut query {
+    for (transform, mut position) in &mut query {
         let new_position = (transform.translation() / CHUNK_SIZE as f32).as_ivec3();
-        
-        if let Some(loader) = opt_loader {
-            if **position != new_position {
+        // Avoid updating Changed except for when we're actually changing the value.
+        if **position != new_position {
+            //println!("chunk position: {}", new_position);
 
+            **position = new_position;
+        }
+    }
+}
+
+pub fn update_chunk_loaders (
+    mut query: Query<(Entity, &ChunkPosition, &mut ChunkLoader), (Changed<ChunkPosition>)>,
+    mut chunk_query: Query<(&mut LoadReasonList)>,
+
+    mut chunk_map: ResMut<ChunkMap>,
+
+    mut commands: Commands,
+
+    mut evw_load_chunk: EventWriter<LoadChunkEvent>,
+) {
+    for (entity, position, mut loader) in &mut query {
+        // Reset whatever it is we're currently loading.
+        // TODO: We should be selectively removing things, maybe. and then we can use range + n for the area where we wont load/generate chunks, but we'll still keep chunks already loaded/generated loaded.
+        for chunk_entity in loader.load_list.iter() {
+            if let Ok(mut load_reason_list) = chunk_query.get_mut(*chunk_entity) {
+                load_reason_list.remove(&LoadReason::Loader(entity));
             }
         }
+        loader.load_list = vec![];
 
-        **position = new_position;
+        // Load everything in our range.
+        let min_corner = **position - loader.range;
+        let max_corner = **position + loader.range;
+        let y = 0;
+        for x in min_corner.x..=max_corner.x {
+            //for y in min_corner.y..=max_corner.y {
+                for z in min_corner.z..=max_corner.z {
+                    if let Some(chunk_entity) = chunk_map.get(&IVec3::new(x, y, z)) {
+                        if let Ok(mut load_reason_list) = chunk_query.get_mut(*chunk_entity) {
+                            // Try to remove this. Just in case.
+                            load_reason_list.remove(&LoadReason::Spawning(entity));
+
+                            load_reason_list.insert(LoadReason::Loader(entity));
+
+                        }
+                    }
+                    else {
+                        evw_load_chunk.send(LoadChunkEvent { chunk: IVec3::new(x, y, z), load_reason: LoadReason::Loader(entity) });
+                    }
+                }
+            //}
+        }
+
     }
 }
 
@@ -148,9 +192,9 @@ pub struct ChunkLoader{
 pub struct ChunkPosition(IVec3);
 
 #[derive(Default, Clone, Deref, DerefMut, Component)]
-pub struct LoadReasonList(Vec<LoadReason>);
+pub struct LoadReasonList(HashSet<LoadReason>);
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub enum LoadReason {
     Loader(Entity),
     Spawning(Entity), // TODO: Refactor to "move"? or "teleport"? not sure if we should

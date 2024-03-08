@@ -48,7 +48,8 @@ pub fn update_chunk_meshes (
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
     for (entity, chunk) in query.iter() {
-        let mut voxels = [FULL; ChunkShape::SIZE as usize];
+        // TODO: Default to FULL instead and optimize by providing a buffer where possible
+        let mut voxels = [EMPTY; ChunkShape::SIZE as usize];
         
         for (i, block) in chunk.iter_3d() {
             voxels[ChunkShape::linearize([(i.x + 1) as u32, (i.y + 1) as u32, (i.z + 1) as u32]) as usize] = match block.block_id {
