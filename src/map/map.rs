@@ -7,7 +7,7 @@ use noise::{core::worley::distance_functions::euclidean_squared, NoiseFn, Perlin
 //use rand::{seq::SliceRandom, thread_rng};
 use derive_more::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign, };
 use bevy::{ecs::{entity::{EntityMapper, MapEntities}, reflect::ReflectMapEntities}, prelude::*};
-use crate::{grid3::Grid3, RNGSeed, CHUNK_SIZE};
+use crate::{grid3::Grid3, RNGSeed, CHUNK_SIZE, WORLD_DEPTH, WORLD_HEIGHT, WORLD_SIZE};
 
 use crate::sparse_grid3::SparseGrid3;
 
@@ -43,10 +43,16 @@ pub fn generate_chunks (
     //mut next_mapgen_state: ResMut<NextState<MapGenState>>,
 ) {
     let perlin_noise = Perlin::new(**seed);
-    let noise_gen = ScalePoint::new(perlin_noise).set_all_scales(0.025, 0.025, 0.025, 1.0);
+    let noise_gen = ScalePoint::new(perlin_noise).set_scale(0.025); //.set_all_scales(0.025, 0.025, 0.025, 1.0);
 
     for ev in evr_load_chunk.read() {
+        if !((-WORLD_SIZE[0]..=WORLD_SIZE[0]).contains(&ev.chunk.x) && (-WORLD_SIZE[1]..=WORLD_SIZE[1]).contains(&ev.chunk.z) && (-WORLD_DEPTH..=WORLD_HEIGHT).contains(&ev.chunk.y)) {
+            continue
+        }
+
+        // Check if there's already an entity here.
         if let Some(chunk_entity) = chunk_map.get(&ev.chunk) {
+            // Check to see if the entity is valid.
             if commands.get_entity(*chunk_entity).is_some() {
                 continue
             }
@@ -86,7 +92,7 @@ pub fn generate_chunks (
             loader.load_list.push(chunk_entity);
         }
     }
-    
+
     //next_mapgen_state.set(MapGenState::TempBand);
 }
 

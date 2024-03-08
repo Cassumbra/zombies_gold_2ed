@@ -88,6 +88,12 @@ pub enum GameState {
 }
 
 const CHUNK_SIZE: i32 = 16;
+const WORLD_SIZE: [i32; 2] = [255; 2];
+/// Surface height.
+const WORLD_HEIGHT: i32 = 4;
+/// Underground depth.
+const WORLD_DEPTH: i32 = 12;
+
 
 
 fn main () {
@@ -193,21 +199,23 @@ pub fn move_to_spawn (
 ) {
     //println!("time to move arounda!");
     'entity_checks: for (entity, mut transform) in &mut query {
-        if let Some(chunk_entity) = chunk_map.get(&SPAWN_CHUNK) {
-            if let Ok(chunk) = chunk_query.get(*chunk_entity) {
-                for (y, block) in chunk.iter_column(0, 0).enumerate().rev() {
-                    if block.block_id != BlockID::Air {
-                        transform.translation = IVec3::new(SPAWN_CHUNK.x * CHUNK_SIZE, SPAWN_CHUNK.y * CHUNK_SIZE + y as i32 + 4, SPAWN_CHUNK.z * CHUNK_SIZE).as_vec3();
-                        println!("translation: {}", transform.translation);
-                        commands.entity(entity).remove::<MoveToSpawn>();
-                        continue 'entity_checks
+        for chunk_y in (0..=WORLD_HEIGHT).rev() {
+            if let Some(chunk_entity) = chunk_map.get(&IVec3::new(SPAWN_CHUNK.x, chunk_y, SPAWN_CHUNK.z)) {
+                if let Ok(chunk) = chunk_query.get(*chunk_entity) {
+                    for (y, block) in chunk.iter_column(0, 0).enumerate().rev() {
+                        if block.block_id != BlockID::Air {
+                            transform.translation = IVec3::new(SPAWN_CHUNK.x * CHUNK_SIZE, chunk_y * CHUNK_SIZE + y as i32 + 2, SPAWN_CHUNK.z * CHUNK_SIZE).as_vec3();
+                            commands.entity(entity).remove::<MoveToSpawn>();
+                            continue 'entity_checks
+                        }
                     }
                 }
-                todo!("We need to try some other spawn locations!");
             }
+            evw_load_chunk.send(LoadChunkEvent { chunk: IVec3::new(SPAWN_CHUNK.x, chunk_y, SPAWN_CHUNK.z), load_reason: LoadReason::Spawning(entity) });
+            continue 'entity_checks
         }
 
-        evw_load_chunk.send(LoadChunkEvent { chunk: SPAWN_CHUNK, load_reason: LoadReason::Spawning(entity) });
+        todo!("We need to try some other spawn locations!");
     }
 }
 
