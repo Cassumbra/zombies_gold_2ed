@@ -328,7 +328,7 @@ pub fn setup(
         },
          */
         SpatialBundle::default(),
-        movement::CharacterControllerBundle::new(Collider::cylinder(height, 0.4)).with_movement(
+        movement::CharacterControllerBundle::new(Collider::capsule(height, 0.4)).with_movement(
             30.0,
             0.92,
             7.0,

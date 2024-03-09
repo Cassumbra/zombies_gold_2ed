@@ -46,8 +46,9 @@ pub fn generate_chunks (
 ) {
     let perlin_noise3d = Perlin::new(**seed);
     let scaled_perlin = ScalePoint::new(perlin_noise3d).set_scale(0.025); //.set_all_scales(0.025, 0.025, 0.025, 1.0);
-    let gradient = AxialGradient{ val_1: 1.0, val_2: -1.0, point_1: [0.0, 0.0, 0.0, 0.0], point_2: [0.0, (WORLD_HEIGHT * CHUNK_SIZE) as f64, 0.0, 0.0] };
-    let noise_gen = Blend::new(scaled_perlin, gradient, Constant::new(0.5));
+    //let gradient = AxialGradient{ val_1: 1.0, val_2: -1.0, point_1: [0.0, 0.0, 0.0, 0.0], point_2: [0.0, (WORLD_HEIGHT * CHUNK_SIZE) as f64, 0.0, 0.0] };
+    let gradient = SingleDirectionAxialGradient { values: vec![1.0, 0.0, -1.0], points: vec![-(WORLD_DEPTH * CHUNK_SIZE) as f64, 0.0, (WORLD_HEIGHT * CHUNK_SIZE) as f64], dimension: 1 };
+    let noise_gen = Blend::new(scaled_perlin, gradient, Constant::new(0.7));
 
     let mut chunks_to_load = Vec::new();
 
@@ -332,7 +333,37 @@ impl TextureCoords {
     }
 }
 
+pub struct SingleDirectionAxialGradient {
+    pub values: Vec<f64>,
+    pub points: Vec<f64>,
+    pub dimension: usize,
+}
+impl SingleDirectionAxialGradient {
 
+}
+impl<const N: usize> NoiseFn<f64, N> for SingleDirectionAxialGradient {
+    fn get(&self, point: [f64; N]) -> f64 {
+        if point[self.dimension] < self.points[0] {
+            return self.values[0];
+        }
+
+        for (i, _) in self.values.iter().enumerate() {
+            if i + 1 == self.values.len() {
+                return *self.values.last().unwrap();
+            }
+
+            if (self.points[i]..=self.points[i+1]).contains(&point[self.dimension]) {
+                let a = (self.values[i+1] - self.values[i]) / (self.points[i+1] - self.points[i]);
+                let b = self.values[i] - (a * self.points[i]);
+                return a * point[self.dimension] + b;
+            }
+        }
+
+        return 0.0;
+    }
+}
+
+/// This struct is overkill, but pretty cool.
 pub struct AxialGradient {
     pub val_1: f64,
     pub val_2: f64,
