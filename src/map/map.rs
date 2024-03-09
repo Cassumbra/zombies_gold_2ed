@@ -1,9 +1,9 @@
-use std::{cmp::{max, min}, ops::{Index, RangeBounds}};
-use bevy::{prelude::*, utils::{HashMap, HashSet}};
+use std::{ops::{Range, RangeBounds}};
+use bevy::{math::Vec3A, prelude::*, utils::{HashMap, HashSet}};
 use fastrand::{Rng, choice};
 use sark_grids::Grid;
 //use grid_tree::OctreeU32;
-use noise::{core::worley::distance_functions::euclidean_squared, NoiseFn, Perlin, ScalePoint, Worley};
+use noise::{core::worley::distance_functions::euclidean_squared, Blend, Constant, NoiseFn, Perlin, ScalePoint, Worley};
 //use rand::{seq::SliceRandom, thread_rng};
 use derive_more::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign, };
 use bevy::{ecs::{entity::{EntityMapper, MapEntities}, reflect::ReflectMapEntities}, prelude::*};
@@ -42,8 +42,10 @@ pub fn generate_chunks (
 
     //mut next_mapgen_state: ResMut<NextState<MapGenState>>,
 ) {
-    let perlin_noise = Perlin::new(**seed);
-    let noise_gen = ScalePoint::new(perlin_noise).set_scale(0.025); //.set_all_scales(0.025, 0.025, 0.025, 1.0);
+    let perlin_noise3d = Perlin::new(**seed);
+    let scaled_perlin = ScalePoint::new(perlin_noise3d).set_scale(0.025); //.set_all_scales(0.025, 0.025, 0.025, 1.0);
+    let gradient = AxialGradient{ val_1: 1.0, val_2: -1.0, point_1: [0.0, 0.0, 0.0, 0.0], point_2: [0.0, (WORLD_HEIGHT * CHUNK_SIZE) as f64, 0.0, 0.0] };
+    let noise_gen = Blend::new(scaled_perlin, gradient, Constant::new(0.5));
 
     for ev in evr_load_chunk.read() {
         if !((-WORLD_SIZE[0]..=WORLD_SIZE[0]).contains(&ev.chunk.x) && (-WORLD_SIZE[1]..=WORLD_SIZE[1]).contains(&ev.chunk.z) && (-WORLD_DEPTH..=WORLD_HEIGHT).contains(&ev.chunk.y)) {
@@ -305,183 +307,74 @@ impl TextureCoords {
     }
 }
 
-// Components
 
-/*
-#[derive(Component, Clone, Copy, Reflect)]
-#[reflect(Component)]
-pub struct MapSize {
-    pub width: i32,
-    pub height: i32,
+pub struct AxialGradient {
+    pub val_1: f64,
+    pub val_2: f64,
+    pub point_1: [f64; 4],
+    pub point_2: [f64; 4],
 }
-impl Default for MapSize {
-    fn default() -> MapSize {
-        MapSize {
-            width: 80,
-            height: 40,
-        }
-    }
-}
- */
-
-
-//Systems
-/*
-pub fn entity_map_rooms_passages (
-    mut commands: Commands,
-
-    mut res_rooms: ResMut<Rooms>,
-    map_size: Res<MapSize>,
-) {
-
-    let mut map_objects: Grid<Option<Entity>> = Grid::new([map_size.width, map_size.height]);
-
-    let mut rng = rand::thread_rng();
-
-    const MAX_ROOMS: i32 = 30;
-    const MIN_SIZE: i32 = 6;
-    const MAX_SIZE: i32 = 10;
-
-    let wall_rect = Rectangle::new(IVec2::new(0, 0), map_size.width as i32 - 1, map_size.height as i32 - 1);
-    fill_rect(&mut commands, &mut map_objects, WallBundle::default(), &wall_rect);
-
-    let mut rooms = Vec::<Rectangle>::new();
-
-    for _i in 0..=MAX_ROOMS {
-        let w = rng.gen_range(MIN_SIZE..MAX_SIZE);
-        let h = rng.gen_range(MIN_SIZE..MAX_SIZE);
-        let x = rng.gen_range(1..(map_size.width as i32 - w - 1));
-        let y = rng.gen_range(1..(map_size.height as i32 - h - 1));
-
-        
-
-        let room = Rectangle::new(IVec2::new(x, y), w, h);
-        //let room_ent = commands.spawn().insert(rect).id();
-
-        let mut ok = true;
-        for other_room in rooms.iter() {
-            if room.intersect(other_room) { ok = false }
-        }
-        if ok {
-            fill_rect (&mut commands, &mut map_objects, FloorBundle::default(), &room);
-
-            if !rooms.is_empty() {
-                let center = room.center();
-                let previous_center = rooms[rooms.len()-1].center();
-                if rng.gen_range(0..=1) == 1 {
-                    fill_row(&mut commands, &mut map_objects, FloorBundle::default(), previous_center.x, center.x, previous_center.y);
-                    fill_column(&mut commands, &mut map_objects, FloorBundle::default(), previous_center.y, center.y, center.x);
-                } else {
-                    fill_column(&mut commands, &mut map_objects, FloorBundle::default(), previous_center.y, center.y, previous_center.x);
-                    fill_row(&mut commands, &mut map_objects, FloorBundle::default(), previous_center.x, center.x, center.y);
-                }
-            }
-
-            rooms.push(room);
-            commands.spawn(room);
-        }
+impl AxialGradient {
+    // TODO: We could potentially precalculate full from points_range.
+    fn get_from_distances(&self, full: f64, partial: f64) -> f64 {
+        // Normalizing with:
+        // a = (max'-min')/(max-min)
+        // b = min' - (a * min)
+        // newvalue = a * value + b
+        // from: https://stats.stackexchange.com/questions/70801/how-to-normalize-data-to-0-1-range#comment137312_70808
+        // Making min be 0 simplifies our equations.
+        let a = (self.val_2 - self.val_1)/(full);
+        let b = self.val_1;
+        a * partial + b
     }
 
-    res_rooms.0 = rooms;
+    fn get_from_sidelengths(&self, full: f64, to_min: f64, to_max: f64) -> f64 {
+        // Heron's formula
+        let s = (full + to_min + to_max) / 2.0;
+        let area = (s * (s - full) * (s - to_min) * (s - to_max)).sqrt();
 
-    commands.insert_resource(NextState(Some(GameState::Playing)));
-}
- */
+        let height = 2.0 * (area / full);
 
-/*
-fn simple_entity_map(
-    mut commands: Commands,
+        let partial = (to_min.powi(2) - height.powi(2)).sqrt();
 
-    map_size: Res<MapSize>,
-    collidables: Res<Collidables>,
-) {
-    let mut rng = rand::thread_rng();
-
-    draw_line_cardinal(&mut commands, IVec2::new(0, 0), IVec2::new(0, map_size.height as i32 - 1));
-    draw_line_cardinal(&mut commands, IVec2::new(map_size.width as i32 - 1, 0), IVec2::new(map_size.width as i32 - 1, map_size.height as i32 - 1));
-
-    draw_line_cardinal(&mut commands, IVec2::new(0, map_size.height as i32 - 1), IVec2::new(map_size.width as i32 - 1, map_size.height as i32 - 1));
-    draw_line_cardinal(&mut commands, IVec2::new(0, 0), IVec2::new(map_size.width as i32 - 1, 0));
-
-    for _i in 0..100 {
-        let x = rng.gen_range(0..map_size.width);
-        let y = rng.gen_range(0..map_size.height);
-
-        commands.spawn(WallBundle{
-            position: Position (IVec2::new(x as i32, y as i32)),
-            ..Default::default()
-        });
-    }
-}
- */
-
-/*
-fn draw_line_cardinal( commands: &mut Commands, pos1: IVec2, pos2: IVec2 ) {
-    if pos1.x == pos2.x {
-        for i in pos1.y ..= pos2.y {
-            commands.spawn(WallBundle{
-                position: Position (IVec2::new(pos1.x, i)),
-                ..Default::default()
-            });
-        }
-    }
-    else if pos1.y == pos2.y {
-        for i in pos1.x ..= pos2.x {
-            commands.spawn(WallBundle{
-                position: Position (IVec2::new(i, pos1.y)),
-                ..Default::default()
-            });
-        }
-    }
-    else {
-        eprintln!("ERROR: Not a cardinal direction!");
+        self.get_from_distances(full, partial)
     }
 }
 
-// Functions
-fn fill_rect ( commands: &mut Commands, map_objects: &mut Grid<Option<Entity>>, bundle: impl Bundle + Copy, rect: &Rectangle) {
-    
-    
-    for pos in map_objects.clone().rect_iter([rect.pos1.x, rect.pos1.y]..=[rect.pos2.x, rect.pos2.y]) {
-        if pos.1.is_some() {
-            let old_entity = map_objects[[pos.0.x as u32, pos.0.y as u32]].unwrap();
-            commands.entity(old_entity).despawn();
-        }
-        let entity = commands.spawn(bundle)
-            .insert(Position(IVec2::new(pos.0.x, pos.0.y)))
-            .id();
-        
-        map_objects[[pos.0.x as u32, pos.0.y as u32]] = Some(entity);
+/// 1-dimensional gradient
+impl NoiseFn<f64, 1> for AxialGradient {
+    fn get(&self, point: [f64; 1]) -> f64 {
+        self.get_from_distances(self.point_2[0] - self.point_1[0], point[0] - self.point_1[0])
     }
 }
 
-fn fill_row(commands: &mut Commands, map_objects: &mut Grid<Option<Entity>>, bundle: impl Bundle + Copy, x1: i32, x2: i32, y: i32) {
-    for x in min(x1, x2)..=max(x1, x2) {
-        if map_objects[[x as u32, y as u32]].is_some() {
-            let old_entity = map_objects[[x as u32, y as u32]].unwrap();
-            commands.entity(old_entity).despawn();
-        }
-        let entity = commands.spawn(bundle)
-            .insert(Position(IVec2::new(x, y)))
-            .id();
-        
-        map_objects[[x as u32, y as u32]] = Some(entity);
+
+/// 2-dimensional gradient
+impl NoiseFn<f64, 2> for AxialGradient {
+    fn get(&self, point: [f64; 2]) -> f64 {
+        let full = ((self.point_2[0] - self.point_1[0]).powi(2) + (self.point_2[1] - self.point_1[1]).powi(2)).sqrt();
+        let to_min = ((point[0] - self.point_1[0]).powi(2) + (point[1] - self.point_1[1]).powi(2)).sqrt();
+        let to_max = ((point[0] - self.point_2[0]).powi(2) + (point[1] - self.point_2[1]).powi(2)).sqrt();
+        self.get_from_sidelengths(full, to_min, to_max)
     }
 }
 
-fn fill_column(commands: &mut Commands, map_objects: &mut Grid<Option<Entity>>, bundle: impl Bundle + Copy, y1: i32, y2: i32, x: i32) {
-    for y in min(y1, y2)..=max(y1, y2) {
-        if map_objects[[x as u32, y as u32]].is_some() {
-            let old_entity = map_objects[[x as u32, y as u32]].unwrap();
-            commands.entity(old_entity).despawn();
-        }
-        let entity = commands.spawn(bundle)
-            .insert(Position(IVec2::new(x, y)))
-            .id();
-        
-        map_objects[[x as u32, y as u32]] = Some(entity);
+/// 3-dimensional gradient
+impl NoiseFn<f64, 3> for AxialGradient {
+    fn get(&self, point: [f64; 3]) -> f64 {
+        let full = ((self.point_2[0] - self.point_1[0]).powi(2) + (self.point_2[1] - self.point_1[1]).powi(2) + (self.point_2[2] - self.point_1[2]).powi(2)).sqrt();
+        let to_min = ((point[0] - self.point_1[0]).powi(2) + (point[1] - self.point_1[1]).powi(2) + (point[2] - self.point_1[2]).powi(2)).sqrt();
+        let to_max = ((point[0] - self.point_2[0]).powi(2) + (point[1] - self.point_2[1]).powi(2) + (point[2] - self.point_2[2]).powi(2)).sqrt();
+        self.get_from_sidelengths(full, to_min, to_max)
     }
 }
- */
 
-
+/// 4-dimensional gradient
+impl NoiseFn<f64, 4> for AxialGradient {
+    fn get(&self, point: [f64; 4]) -> f64 {
+        let full = ((self.point_2[0] - self.point_1[0]).powi(2) + (self.point_2[1] - self.point_1[1]).powi(2) + (self.point_2[2] - self.point_1[2]).powi(2) + (self.point_2[3] - self.point_1[3]).powi(2)).sqrt();
+        let to_min = ((point[0] - self.point_1[0]).powi(2) + (point[1] - self.point_1[1]).powi(2) + (point[2] - self.point_1[2]).powi(2) + (point[3] - self.point_1[3]).powi(2)).sqrt();
+        let to_max = ((point[0] - self.point_2[0]).powi(2) + (point[1] - self.point_2[1]).powi(2) + (point[2] - self.point_2[2]).powi(2) + (point[3] - self.point_2[3]).powi(2)).sqrt();
+        self.get_from_sidelengths(full, to_min, to_max)
+    }
+}
