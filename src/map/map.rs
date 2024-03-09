@@ -1,4 +1,4 @@
-use std::{ops::{Range, RangeBounds}};
+use std::{collections::VecDeque, ops::{Range, RangeBounds}};
 use bevy::{math::Vec3A, prelude::*, utils::{HashMap, HashSet}};
 use fastrand::{Rng, choice};
 use sark_grids::Grid;
@@ -23,6 +23,7 @@ impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
         app
             .init_resource::<ChunkMap>()
+            .init_resource::<ChunkLoadingQueue>()
             .add_event::<LoadChunkEvent>();
     }
 }
@@ -39,6 +40,7 @@ pub fn generate_chunks (
 
     mut loader_query: Query<(&mut ChunkLoader)>,
 
+    mut loading_queue: ResMut<ChunkLoadingQueue>,
 
     //mut next_mapgen_state: ResMut<NextState<MapGenState>>,
 ) {
@@ -47,7 +49,10 @@ pub fn generate_chunks (
     let gradient = AxialGradient{ val_1: 1.0, val_2: -1.0, point_1: [0.0, 0.0, 0.0, 0.0], point_2: [0.0, (WORLD_HEIGHT * CHUNK_SIZE) as f64, 0.0, 0.0] };
     let noise_gen = Blend::new(scaled_perlin, gradient, Constant::new(0.5));
 
+    let mut chunks_to_load = Vec::new();
+
     for ev in evr_load_chunk.read() {
+        // Ignore chunks that are out of generation scope.
         if !((-WORLD_SIZE[0]..=WORLD_SIZE[0]).contains(&ev.chunk.x) && (-WORLD_SIZE[1]..=WORLD_SIZE[1]).contains(&ev.chunk.z) && (-WORLD_DEPTH..=WORLD_HEIGHT).contains(&ev.chunk.y)) {
             continue
         }
@@ -59,6 +64,23 @@ pub fn generate_chunks (
                 continue
             }
         }
+
+        match ev.load_reason {
+            LoadReason::Loader(_) => loading_queue.push_front(*ev),
+            LoadReason::Spawning(_) => chunks_to_load.push(*ev),
+        }
+    }
+
+    // Load only a limited amount of chunks each frame to make things smoother.
+    for _ in 0..4 {
+        if let Some(ev) = loading_queue.pop_back() {
+            chunks_to_load.push(ev);
+        }
+    }
+    
+
+    for ev in chunks_to_load.iter() {
+        //println!("loading: {:?}", ev.chunk);
 
         let mut chunk = Chunk(Grid3::filled(Block::new(BlockID::Air), [CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE]));
     
@@ -187,7 +209,10 @@ pub fn update_chunk_loaders (
     }
 }
 
-#[derive(Clone, Event)]
+#[derive(Default, Clone, Deref, DerefMut, Resource)]
+pub struct ChunkLoadingQueue(VecDeque<LoadChunkEvent>);
+
+#[derive(Clone, Copy, Event)]
 pub struct LoadChunkEvent {
     pub chunk: IVec3,
     pub load_reason: LoadReason,
