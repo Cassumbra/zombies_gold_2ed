@@ -156,6 +156,8 @@ fn main () {
     .add_systems(Update, rendering::update_chunk_meshes.run_if(in_state(GameState::Playing)))
     .add_systems(Update, update_chunk_colliders)
     .add_systems(Update, move_to_spawn.run_if(in_state(GameState::Playing)))
+    .add_systems(Update, mining)
+    .add_systems(Update, damage_block)
     
     
     .add_systems(
@@ -265,6 +267,10 @@ pub fn update_chunk_colliders (
     query: Query<(Entity, &Chunk), Or<(Added<Chunk>, Changed<Chunk>)>>,
 ) {
     for (entity, chunk) in &query {
+        //if commands.get_entity(entity).is_none() {
+        //    continue
+        //}
+
         // TODO: Optimize this. we don't need colliders if a block is touching air.
         let colliders: Vec::<(Vector, Quat, Collider)> = chunk.iter_3d().filter_map(|(position, block)| {
             if block.block_id != BlockID::Air {
@@ -279,8 +285,8 @@ pub fn update_chunk_colliders (
 
         if !colliders.is_empty() {
             commands.entity(entity)
-            .insert(Collider::compound(colliders))
-            .insert(RigidBody::Static);
+            .try_insert(Collider::compound(colliders))
+            .try_insert(RigidBody::Static);
         }
     }
 }
@@ -289,9 +295,9 @@ pub fn update_chunk_colliders (
 
 pub fn setup(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    assets: Res<AssetServer>,
+    //mut meshes: ResMut<Assets<Mesh>>,
+    //mut materials: ResMut<Assets<StandardMaterial>>,
+    //assets: Res<AssetServer>,
 ) {
 
     let height = 1.8;
@@ -328,6 +334,7 @@ pub fn setup(
         },
          */
         SpatialBundle::default(),
+        // TODO: It feels like using a capsule causes the game to run worse??? but also: there's some weird bugginess with using a cylinder
         movement::CharacterControllerBundle::new(Collider::capsule(height, 0.4)).with_movement(
             30.0,
             0.92,
@@ -348,7 +355,8 @@ pub fn setup(
         //Transform::default(),
         //GlobalTransform::default(),
         ChunkPosition::default(),
-        ChunkLoader { range: 5, load_list: vec![] }
+        ChunkLoader { range: 5, load_list: vec![] },
+        MiningTimer::default(),
     ))
     .add_child(camera);
 }

@@ -41,6 +41,8 @@ type ChunkShape = ConstShape3u32<18, 18, 18>;
 pub fn update_chunk_meshes (
     mut commands: Commands,
 
+    // TODO: If we end up having chunk changes that don't result in rendering changes, this could end up being wasted performance.
+    //       Using some events might be a good idea...
     query: Query<(Entity, &Chunk), Or<(Added<Chunk>, Changed<Chunk>)>>,
 
     atlas: Res<Atlas>,
@@ -48,6 +50,10 @@ pub fn update_chunk_meshes (
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
     for (entity, chunk) in query.iter() {
+        //if commands.get_entity(entity).is_none() {
+        //    continue
+        //}
+
         // TODO: Default to FULL instead and optimize by providing a buffer where possible
         let mut voxels = [EMPTY; ChunkShape::SIZE as usize];
         
@@ -84,16 +90,18 @@ pub fn update_chunk_meshes (
                 positions.extend_from_slice(&face.quad_mesh_positions(&quad.into(), 1.0));
                 normals.extend_from_slice(&face.quad_mesh_normals());
 
-                let block_id = chunk[UVec3::from(quad.minimum) - UVec3::new(1, 1, 1)];
-                let attributes = block_id.get_attributes();
+                let block = chunk[UVec3::from(quad.minimum) - UVec3::new(1, 1, 1)];
+                let attributes = block.get_attributes();
                 let normal = face.signed_normal();
 
-                let tex_coord = if normal.x == 1 {attributes.tex_coords.east}
+                let mut tex_coord = if normal.x == 1 {attributes.tex_coords.east}
                              else if normal.x == -1 {attributes.tex_coords.west}
                              else if normal.y == 1 {attributes.tex_coords.top}
                              else if normal.y == -1 {attributes.tex_coords.bottom}
                              else if normal.z == 1 {attributes.tex_coords.north}
                              else {attributes.tex_coords.west};
+
+                tex_coord.x += block.damage as i32;
 
                 let quad_uvs = face.tex_coords(RIGHT_HANDED_Y_UP_CONFIG.u_flip_face, true, &UnorientedQuad::from(quad)).map(|uv| {
                     let mut u = uv[0] * 8.0;
@@ -161,10 +169,10 @@ pub fn update_chunk_meshes (
         });
         */
         commands.entity(entity)
-            .insert(mesh_handle)
-            .insert(materials.add(material))
-            .insert(Visibility::default())
-            .insert(InheritedVisibility::default())
-            .insert(ViewVisibility::default());
+            .try_insert(mesh_handle)
+            .try_insert(materials.add(material))
+            .try_insert(Visibility::default())
+            .try_insert(InheritedVisibility::default())
+            .try_insert(ViewVisibility::default());
     }
 }

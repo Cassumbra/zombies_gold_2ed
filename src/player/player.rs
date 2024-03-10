@@ -13,7 +13,7 @@ use leafwing_input_manager::input_mocking::QueryInput;
 
 use crate::movement::{Grounded, JumpImpulse, MovementAcceleration, MovementAction, MovementType};
 use crate::point::Point3d;
-use crate::Action;
+use crate::{Action, MiningEvent};
 
 //use crate::rendering::window::WindowChangeEvent;
 
@@ -28,7 +28,9 @@ pub fn player_input_game (
     //query: Query<(Entity, &ActionState<Action>, &MovementAcceleration, &JumpImpulse, &mut LinearVelocity, Has<Grounded>,), (With<Player>)>,
     mut query: Query<(Entity, &ActionState<Action>, &mut Transform, &Children), (With<Player>)>,
     mut cam_query: Query<(&mut Transform), (Without<Player>)>,
-    mut movement_event_writer: EventWriter<MovementAction>,
+    
+    mut evw_movement: EventWriter<MovementAction>,
+    mut evw_mining: EventWriter<MiningEvent>,
 
     mut primary_window: Query<&mut Window, With<PrimaryWindow>>
 ) {
@@ -64,6 +66,11 @@ pub fn player_input_game (
             if action_state.just_pressed(&Action::Primary) {
                 window.cursor.grab_mode = CursorGrabMode::Confined;
                 window.cursor.visible = false;
+                evw_mining.send(MiningEvent { entity: player, is_start: true });
+            }
+
+            if action_state.just_released(&Action::Primary) {
+                evw_mining.send(MiningEvent { entity: player, is_start: false });
             }
 
             if window.cursor.grab_mode == CursorGrabMode::Confined {
@@ -90,11 +97,11 @@ pub fn player_input_game (
         //direction = direction.normalize_or_zero();
 
         if direction != Vec3::ZERO {
-            movement_event_writer.send(MovementAction::new(player, MovementType::Move(Vec2::new(direction.x, direction.z)) ));
+            evw_movement.send(MovementAction::new(player, MovementType::Move(Vec2::new(direction.x, direction.z)) ));
         }
 
         if action_state.pressed(&Action::Jump) {
-            movement_event_writer.send(MovementAction::new(player, MovementType::Jump));
+            evw_movement.send(MovementAction::new(player, MovementType::Jump));
         }
     }   
 }

@@ -278,7 +278,7 @@ impl BlockID {
         match self {
             BlockID::Air => BlockAttributes { health: 0, ..default()  },
             BlockID::Dirt => BlockAttributes { health: 4, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 0)), ..default() },
-            BlockID::Grass => BlockAttributes { health: 4, tex_coords: TextureCoords::asymmetric_y(IVec2::new(0, 1), IVec2::new(0, 0), IVec2::new(1, 1)), breaks_into: BlockID::Dirt, ..default() },
+            BlockID::Grass => BlockAttributes { health: 1, tex_coords: TextureCoords::asymmetric_y(IVec2::new(0, 1), IVec2::new(0, 0), IVec2::new(1, 1)), breaks_into: BlockID::Dirt, ..default() },
             BlockID::Stone => BlockAttributes { health: 6, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 2)), ..default() },
             // Logs will have special behavior for how they get mined, most likely. (Treefelling)
             BlockID::Log => BlockAttributes { health: 2, ..default() },
