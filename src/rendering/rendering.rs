@@ -1,3 +1,5 @@
+use std::mem::size_of;
+
 use bevy::prelude::*;
 use bevy::render::mesh::{Indices, MeshVertexAttribute, PrimitiveTopology, VertexAttributeValues};
 use bevy::render::render_asset::RenderAssetUsages;

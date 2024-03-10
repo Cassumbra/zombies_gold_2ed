@@ -252,12 +252,12 @@ pub struct Chunk(Grid3<Block>);
 pub struct Block {
     pub block_id: BlockID,
     pub damage: u8,
-    pub data: [BlockData; 1],
+    //pub data: [BlockData; 1],
 }
 impl Block {
     pub fn new(block_id: BlockID) -> Block {
         // TODO: Make the BlockData thing be tailored for the block we're making.
-        Block {block_id, damage: 0, data: [BlockData::None]}
+        Block {block_id, damage: 0, }//data: [BlockData::None]}
     }
 
     pub fn get_attributes(self) -> BlockAttributes {

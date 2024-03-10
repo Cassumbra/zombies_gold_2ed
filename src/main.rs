@@ -8,6 +8,8 @@
 
 #![feature(const_fn_floating_point_arithmetic)]
 
+use std::mem::size_of;
+
 use bevy::{app::AppExit, ecs::schedule::ScheduleLabel, pbr::wireframe::WireframePlugin, prelude::*, render::{settings::{RenderCreation, WgpuFeatures}, RenderPlugin}, window::{exit_on_all_closed, exit_on_primary_closed}};
 use bevy_asset_loader::prelude::*;
 //use bevy_flycam::PlayerPlugin;
@@ -233,10 +235,15 @@ pub fn move_to_spawn (
     }
 }
 
+//let mut material = StandardMaterial::from(Color::WHITE);
+//material.unlit = true;
+//material.base_color_texture = Some(atlas.res_8x8.clone());
+
 #[derive(AssetCollection, Resource)]
 struct Atlas{
     #[asset(path = "textures_8x8.png")]
     pub res_8x8: Handle<Image>,
+
 }
 
 #[derive(Clone, Copy, Resource, Deref, DerefMut, Reflect)]
@@ -306,8 +313,7 @@ pub fn setup(
     //mut materials: ResMut<Assets<StandardMaterial>>,
     //assets: Res<AssetServer>,
 ) {
-
-    let height = 1.8;
+    let height = 1.2;
 
     // Emotional support cube. Uncomment when needed.
     /*
@@ -325,7 +331,7 @@ pub fn setup(
     
     // Camera
     let camera = commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(0.0, (height * 0.9) / 2.0, 0.0),
+        transform: Transform::from_xyz(0.0, (height * 1.0) / 2.0, 0.0),
         ..default()
     })
     .id();

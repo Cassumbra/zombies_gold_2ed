@@ -13,6 +13,7 @@ pub fn setup_ui (
                 // This font is loaded and will be used instead of the default font.
                 //font: asset_server.load("fonts/FiraSans-Bold.ttf"),
                 font_size: 100.0,
+                color: Color::Rgba { red: 1.0, green: 1.0, blue: 1.0, alpha: 0.25 },
                 ..default()
             },
         ) // Set the justification of the Text
