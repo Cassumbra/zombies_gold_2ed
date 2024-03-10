@@ -7,7 +7,7 @@ use noise::{core::worley::distance_functions::euclidean_squared, Blend, Constant
 //use rand::{seq::SliceRandom, thread_rng};
 use derive_more::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign, };
 use bevy::{ecs::{entity::{EntityMapper, MapEntities}, reflect::ReflectMapEntities}, prelude::*};
-use crate::{grid3::Grid3, RNGSeed, CHUNK_SIZE, WORLD_DEPTH, WORLD_HEIGHT, WORLD_SIZE};
+use crate::{grid3::Grid3, MoveToSpawn, RNGSeed, CHUNK_SIZE, WORLD_DEPTH, WORLD_HEIGHT, WORLD_SIZE};
 
 use crate::sparse_grid3::SparseGrid3;
 
@@ -44,16 +44,9 @@ pub fn generate_chunks (
 
     //mut next_mapgen_state: ResMut<NextState<MapGenState>>,
 ) {
-    //let scaled_perlin = ScalePoint::new(Perlin::new(**seed)).set_scale(0.025); //.set_all_scales(0.025, 0.025, 0.025, 1.0);
-    //let gradient = AxialGradient{ val_1: 1.0, val_2: -1.0, point_1: [0.0, 0.0, 0.0, 0.0], point_2: [0.0, (WORLD_HEIGHT * CHUNK_SIZE) as f64, 0.0, 0.0] };
     let gradient = SingleDirectionAxialGradient { values: vec![1.0, 0.0, -0.5], points: vec![-(CHUNK_SIZE) as f64, 0.0, (WORLD_HEIGHT * CHUNK_SIZE) as f64], dimension: 1 };
-    //let gradient_2 = SingleDirectionAxialGradient { values: vec![1.0, 0.0, -1.0], points: vec![-(WORLD_DEPTH * CHUNK_SIZE) as f64, 0.0, (WORLD_HEIGHT * CHUNK_SIZE) as f64], dimension: 1 };
 
     let noise_gen = Blend::new(ScalePoint::new(Perlin::new(**seed)).set_scale(0.025), gradient, Constant::new(0.7));
-    //let noise_gen_2 = Blend::new(ScalePoint::new(Perlin::new(**seed)).set_scale(0.025), gradient_2, Constant::new(0.7));
-
-    //let stone_perlin = Perlin::new(seed.wrapping_add(1));
-    //let stone_noise = Blend::new(noise_gen_2, stone_perlin, Constant::new(-0.7));
 
     let mut chunks_to_load = Vec::new();
 
@@ -166,7 +159,7 @@ pub fn update_chunk_positions (
 }
 
 pub fn update_chunk_loaders (
-    mut query: Query<(Entity, &ChunkPosition, &mut ChunkLoader), (Changed<ChunkPosition>)>,
+    mut query: Query<(Entity, &ChunkPosition, &mut ChunkLoader), (Changed<ChunkPosition>, Without<MoveToSpawn>)>,
     mut chunk_query: Query<(&mut LoadReasonList)>,
 
     chunk_map: Res<ChunkMap>,
