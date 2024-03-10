@@ -44,11 +44,16 @@ pub fn generate_chunks (
 
     //mut next_mapgen_state: ResMut<NextState<MapGenState>>,
 ) {
-    let perlin_noise3d = Perlin::new(**seed);
-    let scaled_perlin = ScalePoint::new(perlin_noise3d).set_scale(0.025); //.set_all_scales(0.025, 0.025, 0.025, 1.0);
+    //let scaled_perlin = ScalePoint::new(Perlin::new(**seed)).set_scale(0.025); //.set_all_scales(0.025, 0.025, 0.025, 1.0);
     //let gradient = AxialGradient{ val_1: 1.0, val_2: -1.0, point_1: [0.0, 0.0, 0.0, 0.0], point_2: [0.0, (WORLD_HEIGHT * CHUNK_SIZE) as f64, 0.0, 0.0] };
-    let gradient = SingleDirectionAxialGradient { values: vec![1.0, 0.0, -1.0], points: vec![-(WORLD_DEPTH * CHUNK_SIZE) as f64, 0.0, (WORLD_HEIGHT * CHUNK_SIZE) as f64], dimension: 1 };
-    let noise_gen = Blend::new(scaled_perlin, gradient, Constant::new(0.7));
+    let gradient = SingleDirectionAxialGradient { values: vec![1.0, 0.0, -0.5], points: vec![-(CHUNK_SIZE) as f64, 0.0, (WORLD_HEIGHT * CHUNK_SIZE) as f64], dimension: 1 };
+    //let gradient_2 = SingleDirectionAxialGradient { values: vec![1.0, 0.0, -1.0], points: vec![-(WORLD_DEPTH * CHUNK_SIZE) as f64, 0.0, (WORLD_HEIGHT * CHUNK_SIZE) as f64], dimension: 1 };
+
+    let noise_gen = Blend::new(ScalePoint::new(Perlin::new(**seed)).set_scale(0.025), gradient, Constant::new(0.7));
+    //let noise_gen_2 = Blend::new(ScalePoint::new(Perlin::new(**seed)).set_scale(0.025), gradient_2, Constant::new(0.7));
+
+    //let stone_perlin = Perlin::new(seed.wrapping_add(1));
+    //let stone_noise = Blend::new(noise_gen_2, stone_perlin, Constant::new(-0.7));
 
     let mut chunks_to_load = Vec::new();
 
@@ -97,10 +102,17 @@ pub fn generate_chunks (
             if noise_val >= 0.0 {
                 *block_val = Block::new(BlockID::Dirt);
                 // Make our block grass instead of dirt if the block above is air.
-                if noise_gen.get([point_x, point_y + 1.0, point_z]) < 0.0 {
+                if noise_gen.get([point_x, point_y + 1.0, point_z]) < 0.0 && point_y > 0.0 {
                     *block_val = Block::new(BlockID::Grass);
                 }
+                if (noise_gen.get([point_x, point_y + 5.0, point_z]) > 0.0) || point_y < -5.0 {
+                    *block_val = Block::new(BlockID::Stone);
+                }
             }
+            //let stone_noise_val = stone_noise.get([point_x, point_y, point_z]);
+            //if stone_noise_val >= 0.05 {
+            //    *block_val = Block::new(BlockID::Stone);
+            //}
         }
         
         let chunk_entity = commands.spawn(chunk)
@@ -333,6 +345,7 @@ impl TextureCoords {
     }
 }
 
+#[derive(Default, Clone)]
 pub struct SingleDirectionAxialGradient {
     pub values: Vec<f64>,
     pub points: Vec<f64>,
@@ -364,6 +377,7 @@ impl<const N: usize> NoiseFn<f64, N> for SingleDirectionAxialGradient {
 }
 
 /// This struct is overkill, but pretty cool.
+#[derive(Default, Clone, Copy)]
 pub struct AxialGradient {
     pub val_1: f64,
     pub val_2: f64,
