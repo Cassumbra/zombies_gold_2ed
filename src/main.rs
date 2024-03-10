@@ -46,6 +46,10 @@ use player::*;
 mod rendering;
 use rendering::*;
 
+#[path = "ui/ui.rs"]
+mod ui;
+use ui::*;
+
 /*
 #[path = "saveload/saveload.rs"]
 mod saveload;
@@ -58,6 +62,8 @@ use setup::*;
 #[path = "simulation/simulation.rs"]
 mod simulation;
 use simulation::*;
+
+
 
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, States, ScheduleLabel, Default)]
@@ -147,6 +153,7 @@ fn main () {
 
     
     .add_systems(Startup, setup)
+    .add_systems(Startup, setup_ui)
 
     .add_systems(Update, map::update_chunk_positions)
     .add_systems(Update, map::update_chunk_loaders)
