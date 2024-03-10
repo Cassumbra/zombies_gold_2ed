@@ -80,8 +80,8 @@ pub fn mining (
                         //println!("forward: {}", global_transform.forward());
                         //println!("normalized forward: {}", global_transform.forward().normalize());
                         let hit_coords = (hit_point - hit.normal / 2.0).round().as_ivec3();
-                        //println!("hit: {:?}, hit_point: {:?}", hit, hit_point);
-                        //println!("hit_coords: {:?}", hit_coords);
+                        println!("hit: {:?}, hit_point: {:?}", hit, hit_point);
+                        println!("hit_coords: {:?}", hit_coords);
 
                         evw_damage_block.send(DamageBlockEvent { position: hit_coords, damage: 1, strength: 1 });
                     }
@@ -112,7 +112,15 @@ pub fn damage_block (
     mut evr_damage_block: EventReader<DamageBlockEvent>,
 ) {
     for ev in evr_damage_block.read() {
-        if let Some(chunk_entity) = chunk_map.get(&(ev.position / CHUNK_SIZE)) {
+        let mut modified_pos = ev.position;
+        
+        if ev.position.x < 0 {modified_pos.x = ev.position.x - 15};
+        if ev.position.y < 0 {modified_pos.y = ev.position.y - 15};
+        if ev.position.z < 0 {modified_pos.z = ev.position.z - 15};
+
+        let chunk_pos = modified_pos / CHUNK_SIZE;
+
+        if let Some(chunk_entity) = chunk_map.get(&chunk_pos) {
             if let Ok(mut chunk) = chunk_query.get_mut(*chunk_entity) {
                 
                 let mut block_pos = ev.position % CHUNK_SIZE;
@@ -121,8 +129,9 @@ pub fn damage_block (
                 if block_pos.y < 0 {block_pos.y += CHUNK_SIZE};
                 if block_pos.z < 0 {block_pos.z += CHUNK_SIZE};
                 
-                //println!("chunk pos: {}", ev.position / CHUNK_SIZE);
-                //println!("block pos: {}", block_pos);
+                println!("position: {}", ev.position);
+                println!("chunk pos: {}", chunk_pos);
+                println!("block pos: {}", block_pos);
                 let attributes = chunk[block_pos].get_attributes();
                 
                 if ev.strength >= attributes.toughness {
