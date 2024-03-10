@@ -114,6 +114,9 @@ pub fn damage_block (
     for ev in evr_damage_block.read() {
         let mut modified_pos = ev.position;
         
+        // TODO: This, and the block of if statements below don't feel very elegant. Perhaps we could get a more mathy solution somehow? Would be nice.
+        // TODO: We should probably make this process of getting chunk coords and local block coords into some function somewhere. Definitely want to do that if we end up needing to do this again. (Likely)
+        // This block of if statements and the one below handle, of course, getting the positions of negative blocks.
         if ev.position.x < 0 {modified_pos.x = ev.position.x - 15};
         if ev.position.y < 0 {modified_pos.y = ev.position.y - 15};
         if ev.position.z < 0 {modified_pos.z = ev.position.z - 15};
