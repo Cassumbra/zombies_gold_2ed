@@ -101,7 +101,7 @@ pub fn update_chunk_meshes (
                              else if normal.y == 1 {attributes.tex_coords.top}
                              else if normal.y == -1 {attributes.tex_coords.bottom}
                              else if normal.z == 1 {attributes.tex_coords.north}
-                             else {attributes.tex_coords.west};
+                             else {attributes.tex_coords.south};
 
                 tex_coord.x += block.damage as i32;
 
