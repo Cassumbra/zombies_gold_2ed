@@ -276,6 +276,7 @@ pub enum BlockID {
     Dirt,
     Grass,
     Stone,
+    StoneBrick,
     Log,
 }
 impl BlockID {
@@ -285,6 +286,7 @@ impl BlockID {
             BlockID::Dirt => BlockAttributes { health: 3, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 0)), ..default() },
             BlockID::Grass => BlockAttributes { health: 1, tex_coords: TextureCoords::asymmetric_y(IVec2::new(0, 1), IVec2::new(0, 0), IVec2::new(1, 1)), breaks_into: BlockID::Dirt, ..default() },
             BlockID::Stone => BlockAttributes { health: 5, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 2)), ..default() },
+            BlockID::StoneBrick => BlockAttributes { health: 5, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 3)), ..default() },
             // Logs will have special behavior for how they get mined, most likely. (Treefelling)
             BlockID::Log => BlockAttributes { health: 2, ..default() },
             
@@ -368,6 +370,40 @@ impl<const N: usize> NoiseFn<f64, N> for SingleDirectionAxialGradient {
         return 0.0;
     }
 }
+
+//Helpers
+pub fn chunk_pos_from_global (global_position: IVec3) -> IVec3 {
+    let mut modified_position = global_position;
+        
+    // TODO: This doesn't feel very elegant. Perhaps we could get a more mathy solution somehow? Would be nice.
+    if global_position.x < 0 {modified_position.x = global_position.x - 15};
+    if global_position.y < 0 {modified_position.y = global_position.y - 15};
+    if global_position.z < 0 {modified_position.z = global_position.z - 15};
+
+    modified_position / CHUNK_SIZE
+}
+
+pub fn block_pos_from_global (global_position: IVec3) -> IVec3 {
+    let mut block_pos = global_position % CHUNK_SIZE;
+
+    if block_pos.x < 0 {block_pos.x += CHUNK_SIZE};
+    if block_pos.y < 0 {block_pos.y += CHUNK_SIZE};
+    if block_pos.z < 0 {block_pos.z += CHUNK_SIZE};
+
+    block_pos
+}
+
+
+
+
+
+
+
+
+
+
+
+// Unused.
 
 /// This struct is overkill, but pretty cool.
 #[derive(Default, Clone, Copy)]

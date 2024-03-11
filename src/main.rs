@@ -167,6 +167,8 @@ fn main () {
     .add_systems(Update, move_to_spawn.run_if(in_state(GameState::Playing)))
     .add_systems(Update, mining)
     .add_systems(Update, damage_block)
+    .add_systems(Update, building)
+    .add_systems(Update, place_block)
     
     
     .add_systems(
@@ -259,14 +261,14 @@ enum Action {
     MoveForward, MoveBackward,
     MoveLeft, MoveRight,
     Crouch, Jump,
-    Look, Primary,
+    Look, Primary, Secondary,
     MenuBack,
 }
 
-const INPUT_MAP: [(Action, InputKind); 9] = [(Action::MoveForward, InputKind::PhysicalKey(KeyCode::KeyW)), (Action::MoveBackward, InputKind::PhysicalKey(KeyCode::KeyS)),
+const INPUT_MAP: [(Action, InputKind); 10] = [(Action::MoveForward, InputKind::PhysicalKey(KeyCode::KeyW)), (Action::MoveBackward, InputKind::PhysicalKey(KeyCode::KeyS)),
                                             (Action::MoveLeft, InputKind::PhysicalKey(KeyCode::KeyA)), (Action::MoveRight, InputKind::PhysicalKey(KeyCode::KeyD)),
                                             (Action::Crouch, InputKind::PhysicalKey(KeyCode::ShiftLeft)), (Action::Jump, InputKind::PhysicalKey(KeyCode::Space)),
-                                            (Action::Look, InputKind::DualAxis(DualAxis::mouse_motion())), (Action::Primary, InputKind::Mouse(MouseButton::Left)),
+                                            (Action::Look, InputKind::DualAxis(DualAxis::mouse_motion())), (Action::Primary, InputKind::Mouse(MouseButton::Left)), (Action::Secondary, InputKind::Mouse(MouseButton::Right)),
                                             (Action::MenuBack, InputKind::PhysicalKey(KeyCode::Escape)),
                                           ];
 
@@ -370,6 +372,7 @@ pub fn setup(
         ChunkPosition::default(),
         ChunkLoader { range: 5, load_list: vec![] },
         MiningTimer::default(),
+        BuildingTimer::default(),
     ))
     .add_child(camera);
 }

@@ -13,7 +13,7 @@ use leafwing_input_manager::input_mocking::QueryInput;
 
 use crate::movement::{Grounded, JumpImpulse, MovementAcceleration, MovementAction, MovementType};
 use crate::point::Point3d;
-use crate::{Action, MiningEvent};
+use crate::{Action, BuildingEvent, MiningEvent};
 
 //use crate::rendering::window::WindowChangeEvent;
 
@@ -31,6 +31,7 @@ pub fn player_input_game (
     
     mut evw_movement: EventWriter<MovementAction>,
     mut evw_mining: EventWriter<MiningEvent>,
+    mut evw_building: EventWriter<BuildingEvent>,
 
     mut primary_window: Query<&mut Window, With<PrimaryWindow>>
 ) {
@@ -72,6 +73,16 @@ pub fn player_input_game (
             if action_state.just_released(&Action::Primary) {
                 evw_mining.send(MiningEvent { entity: player, is_start: false });
             }
+
+
+            if action_state.just_pressed(&Action::Secondary) {
+                evw_building.send(BuildingEvent { entity: player, is_start: true });
+            }
+
+            if action_state.just_released(&Action::Secondary) {
+                evw_building.send(BuildingEvent { entity: player, is_start: false });
+            }
+
 
             if window.cursor.grab_mode == CursorGrabMode::Confined {
                 if let Some(look) = action_state.axis_pair(&Action::Look) {
