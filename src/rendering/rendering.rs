@@ -106,15 +106,29 @@ pub fn update_chunk_meshes (
 
                 tex_coord.x += block.damage as i32;
 
+                
                 let quad_uvs = face.tex_coords(RIGHT_HANDED_Y_UP_CONFIG.u_flip_face, true, &UnorientedQuad::from(quad)).map(|uv| {
                     let mut u = uv[0] * 8.0;
                     let mut v = uv[1] * 8.0;
-                    if u != 0.0 {u -= 1.0};
-                    if v != 0.0 {v -= 1.0};
-                    u += tex_coord.x as f32 * 8.0 + 1.0;
-                    v += tex_coord.y as f32 * 8.0 + 1.0;
+                    //if u != 0.0 {u -= 1.0};
+                    //if v != 0.0 {v -= 1.0};
+                    u += tex_coord.x as f32 * 8.0;
+                    v += tex_coord.y as f32 * 8.0;
                     [u/256.0, v/256.0]
                 });
+                 
+
+                 /*
+                let top_left = (tex_coord.as_vec2() * 8.0).to_array();
+                let top_right = [top_left[0], top_left[1] + 8.0];
+                let bottom_left = [top_left[0] + 8.0, top_left[1]];
+                let bottom_right = [top_left[0] + 8.0, top_left[1] + 8.0];
+
+                let quad_uvs = [bottom_right, top_right,
+                                bottom_left, top_left,];
+
+                let quad_uvs = quad_uvs.map(|[u, v]| [u/256.0, v/256.0]);
+                 */
 
                 uvs.extend_from_slice(&quad_uvs);
             }
