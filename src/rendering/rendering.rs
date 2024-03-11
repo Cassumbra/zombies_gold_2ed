@@ -3,6 +3,7 @@ use std::mem::size_of;
 use bevy::prelude::*;
 use bevy::render::mesh::{Indices, MeshVertexAttribute, PrimitiveTopology, VertexAttributeValues};
 use bevy::render::render_asset::RenderAssetUsages;
+use bevy::render::view::NoFrustumCulling;
 use bevy_xpbd_3d::components::RigidBody;
 use bevy_xpbd_3d::plugins::collision::{Collider, ColliderAabb};
 
@@ -175,6 +176,8 @@ pub fn update_chunk_meshes (
             .try_insert(materials.add(material))
             .try_insert(Visibility::default())
             .try_insert(InheritedVisibility::default())
-            .try_insert(ViewVisibility::default());
+            .try_insert(ViewVisibility::default())
+            // TODO: This is a bandaid fix. Bevy isn't frustum culling correctly and we should properly fix it instead of just disabling it. Oh well.
+            .try_insert(NoFrustumCulling);
     }
 }
