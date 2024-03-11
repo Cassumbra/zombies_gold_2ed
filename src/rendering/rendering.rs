@@ -111,8 +111,8 @@ pub fn update_chunk_meshes (
                     let mut v = uv[1] * 8.0;
                     if u != 0.0 {u -= 1.0};
                     if v != 0.0 {v -= 1.0};
-                    u += tex_coord.x as f32 * 8.0;
-                    v += tex_coord.y as f32 * 8.0;
+                    u += tex_coord.x as f32 * 8.0 + 1.0;
+                    v += tex_coord.y as f32 * 8.0 + 1.0;
                     [u/256.0, v/256.0]
                 });
 
