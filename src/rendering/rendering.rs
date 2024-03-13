@@ -61,7 +61,7 @@ pub fn update_chunk_meshes (
         let mut voxels = [EMPTY; ChunkShape::SIZE as usize];
         
         for (i, block) in chunk.iter_3d() {
-            voxels[ChunkShape::linearize([(i.x + 1) as u32, (i.y + 1) as u32, (i.z + 1) as u32]) as usize] = match block.block_id {
+            voxels[ChunkShape::linearize([(i.x + 1) as u32, (i.y + 1) as u32, (i.z + 1) as u32]) as usize] = match block.id {
                 crate::BlockID::Air => EMPTY,
                 _ => FULL
             }

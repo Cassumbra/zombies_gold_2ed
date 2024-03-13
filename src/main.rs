@@ -29,6 +29,10 @@ use spatial::*;
 mod actions;
 use actions::*;
 
+#[path = "inventory/inventory.rs"]
+mod inventory;
+use inventory::*;
+
 /*
 #[path = "log/log.rs"]
 mod log;
@@ -219,7 +223,7 @@ pub fn move_to_spawn (
                 if let Ok(chunk) = chunk_query.get(*chunk_entity) {
                     //println!("valid entity ! eee!!");
                     for (y, block) in chunk.iter_column(0, 0).enumerate().rev() {
-                        if block.block_id != BlockID::Air {
+                        if block.id != BlockID::Air {
                             transform.translation = IVec3::new(SPAWN_CHUNK.x * CHUNK_SIZE, chunk_y * CHUNK_SIZE + y as i32 + 2, SPAWN_CHUNK.z * CHUNK_SIZE).as_vec3();
                             //println!("translation: {}", transform.translation);
                             commands.entity(entity).remove::<MoveToSpawn>();
@@ -289,7 +293,7 @@ pub fn update_chunk_colliders (
 
         // TODO: Optimize this. we don't need colliders if a block is touching air.
         let colliders: Vec::<(Vector, Quat, Collider)> = chunk.iter_3d().filter_map(|(position, block)| {
-            if block.block_id != BlockID::Air {
+            if block.id != BlockID::Air {
                 Some((Vector::from(position.as_vec3()), Quat::IDENTITY, Collider::cuboid(1.0, 1.0, 1.0)))
             }
             else {
@@ -373,6 +377,7 @@ pub fn setup(
         ChunkLoader { range: 5, load_list: vec![] },
         MiningTimer::default(),
         BuildingTimer::default(),
+        Inventory::default(),
     ))
     .add_child(camera);
 }

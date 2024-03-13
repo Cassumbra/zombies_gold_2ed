@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use bevy_xpbd_3d::plugins::spatial_query::{self, SpatialQuery, SpatialQueryFilter};
 use movement::*;
 
-use crate::{block_pos_from_global, chunk_pos_from_global, Block, BlockID, Chunk, ChunkMap, CHUNK_SIZE};
+use crate::{block_pos_from_global, chunk_pos_from_global, Block, BlockID, Chunk, ChunkMap, Inventory, CHUNK_SIZE};
 pub mod movement;
 
 
@@ -41,12 +41,14 @@ pub struct DamageBlockEvent {
     pub position: IVec3,
     pub damage: u8,
     pub strength: u8,
+    pub entity: Entity,
 }
 
 #[derive(Clone, Copy, Event)]
 pub struct PutBlockEvent {
     pub position: IVec3,
-    pub block_id: BlockID,
+    pub id: BlockID,
+    pub entity: Entity,
 }
 
 
@@ -108,7 +110,7 @@ pub fn mining (
                         println!("hit: {:?}, hit_point: {:?}", hit, hit_point);
                         println!("hit_coords: {:?}", hit_coords);
 
-                        evw_damage_block.send(DamageBlockEvent { position: hit_coords, damage: 1, strength: 1 });
+                        evw_damage_block.send(DamageBlockEvent { position: hit_coords, damage: 1, strength: 1, entity });
                     }
                 }
             }
@@ -131,6 +133,7 @@ pub fn mining (
 
 pub fn damage_block (
     mut chunk_query: Query<&mut Chunk>,
+    mut inventory_query: Query<&mut Inventory>,
 
     mut chunk_map: ResMut<ChunkMap>,
 
@@ -150,6 +153,17 @@ pub fn damage_block (
                 
                 if ev.strength >= attributes.toughness {
                     chunk[block_pos].damage = chunk[block_pos].damage + ev.damage;
+
+                    if let Some(drop) = attributes.give_on_damage {
+                        if let Ok(mut inventory) = inventory_query.get_mut(ev.entity) {
+                            if let Err(fault) = inventory.insert_item(drop) {
+                                match fault {
+                                    crate::ItemInsertFault::NoSpace => todo!("We should drop the item as an entity!"),
+                                    crate::ItemInsertFault::InsufficientSpace => todo!("We should drop some of the item as an entity!"),
+                                }
+                            }
+                        }
+                    }
                     
                     if chunk[block_pos].damage == attributes.health {
                         chunk[block_pos] = Block::new(attributes.breaks_into);
@@ -194,7 +208,7 @@ pub fn building (
                         let hit_coords = (hit_point + hit.normal / 2.0).round().as_ivec3();
 
 
-                        evw_put_block.send(PutBlockEvent { position: hit_coords, block_id: BlockID::StoneBrick } );
+                        evw_put_block.send(PutBlockEvent { position: hit_coords, id: BlockID::StoneBrick, entity } );
                     }
                 }
             }
@@ -217,20 +231,41 @@ pub fn building (
 
 pub fn place_block (
     mut chunk_query: Query<&mut Chunk>,
+    mut inventory_query: Query<&mut Inventory>,
 
     mut chunk_map: ResMut<ChunkMap>,
 
     mut evr_put_block: EventReader<PutBlockEvent>,
 ) {
-    for ev in evr_put_block.read() {
+    'events: for ev in evr_put_block.read() {
         let chunk_pos = chunk_pos_from_global(ev.position);
 
         if let Some(chunk_entity) = chunk_map.get(&chunk_pos) {
             if let Ok(mut chunk) = chunk_query.get_mut(*chunk_entity) {
                 let block_pos = block_pos_from_global(ev.position);
                 
-                if chunk[block_pos].block_id == BlockID::Air {
-                    chunk[block_pos] = Block::new(ev.block_id);
+                if chunk[block_pos].id == BlockID::Air {
+                    if let Ok(mut inventory) = inventory_query.get_mut(ev.entity) {
+                        let attributes = ev.id.get_attributes();
+
+                        for cost_opt in attributes.cost_to_build {
+                            if let Some(cost) = cost_opt {
+                                if cost.amount > inventory.get_item_amount(cost.id) {
+                                    // TODO: Make this some kind of proper in game indicator.
+                                    println!("Not enough to build!");
+                                    continue 'events;
+                                }
+                            }
+                        }
+
+                        for cost_opt in attributes.cost_to_build {
+                            if let Some(cost) = cost_opt {
+                                let _ = inventory.take_item(cost);
+                            }
+                        }
+                    }
+
+                    chunk[block_pos] = Block::new(ev.id);
                 }
                     
             }

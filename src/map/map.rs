@@ -7,7 +7,7 @@ use noise::{core::worley::distance_functions::euclidean_squared, Blend, Constant
 //use rand::{seq::SliceRandom, thread_rng};
 use derive_more::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign, };
 use bevy::{ecs::{entity::{EntityMapper, MapEntities}, reflect::ReflectMapEntities}, prelude::*};
-use crate::{grid3::Grid3, MoveToSpawn, RNGSeed, CHUNK_SIZE, WORLD_DEPTH, WORLD_HEIGHT, WORLD_SIZE};
+use crate::{grid3::Grid3, Item, ItemID, MoveToSpawn, RNGSeed, CHUNK_SIZE, WORLD_DEPTH, WORLD_HEIGHT, WORLD_SIZE};
 
 use crate::sparse_grid3::SparseGrid3;
 
@@ -255,18 +255,18 @@ pub struct Chunk(Grid3<Block>);
 // TODO: Optimization: If we're using too much space, we can try and use u8s instead of enums. :)
 #[derive(Default, Clone, Copy)]
 pub struct Block {
-    pub block_id: BlockID,
+    pub id: BlockID,
     pub damage: u8,
     //pub data: [BlockData; 1],
 }
 impl Block {
-    pub fn new(block_id: BlockID) -> Block {
+    pub fn new(id: BlockID) -> Block {
         // TODO: Make the BlockData thing be tailored for the block we're making.
-        Block {block_id, damage: 0, }//data: [BlockData::None]}
+        Block {id, damage: 0, }//data: [BlockData::None]}
     }
 
     pub fn get_attributes(self) -> BlockAttributes {
-        self.block_id.get_attributes()
+        self.id.get_attributes()
     }
 }
 
@@ -280,13 +280,13 @@ pub enum BlockID {
     Log,
 }
 impl BlockID {
-    fn get_attributes(self) -> BlockAttributes {
+    pub fn get_attributes(self) -> BlockAttributes {
         match self {
             BlockID::Air => BlockAttributes { health: 0, ..default()  },
             BlockID::Dirt => BlockAttributes { health: 3, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 0)), ..default() },
             BlockID::Grass => BlockAttributes { health: 1, tex_coords: TextureCoords::asymmetric_y(IVec2::new(0, 1), IVec2::new(0, 0), IVec2::new(1, 1)), breaks_into: BlockID::Dirt, ..default() },
-            BlockID::Stone => BlockAttributes { health: 5, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 2)), ..default() },
-            BlockID::StoneBrick => BlockAttributes { health: 5, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 3)), ..default() },
+            BlockID::Stone => BlockAttributes { health: 5, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 2)), give_on_damage: Some(Item{ id: ItemID::Stone, amount: 16, }), ..default() },
+            BlockID::StoneBrick => BlockAttributes { health: 5, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 3)), give_on_damage: Some(Item{ id: ItemID::Stone, amount: 2 }), cost_to_build: [Some(Item::new(ItemID::Stone, 16)), None, None],  ..default() },
             // Logs will have special behavior for how they get mined, most likely. (Treefelling)
             BlockID::Log => BlockAttributes { health: 2, ..default() },
             
@@ -305,13 +305,14 @@ pub enum BlockData {
     DamagedAdjacent(u8),
 }
 
-//TODO: Optimization: If we want to get *really* silly with optimization, we can combine everything here into a single unsigned, and start splitting bytes into nibbles
 #[derive(Default, Clone, Copy)]
 pub struct BlockAttributes {
     pub health: u8,
     pub toughness: u8,
     pub tex_coords: TextureCoords,
     pub breaks_into: BlockID,
+    pub give_on_damage: Option<Item>,
+    pub cost_to_build: [Option<Item>; 3],
 }
 /*
 impl BlockAttributes {
