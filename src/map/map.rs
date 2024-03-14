@@ -107,7 +107,7 @@ pub fn generate_chunks (
                     *block_val = Block::new(BlockID::Grass);
 
                     // Tree!
-                    if Rng::with_seed((**seed as u64).wrapping_mul(point_x as u64).wrapping_mul(point_y as u64).wrapping_mul(point_z as u64)).f32() <= 0.10 {
+                    if Rng::with_seed((**seed as u64).wrapping_mul(point_x.abs() as u64).wrapping_mul(point_y.abs() as u64).wrapping_mul(point_z.abs() as u64)).f32() <= 0.01 {
                         let mut visited_positions = Vec::<IVec3>::new();
                         let mut expansion_points = vec![IVec3::new(point_x as i32, point_y as i32 + 1, point_z as i32)];
                         let mut up_chance = 1.0;
@@ -146,7 +146,7 @@ pub fn generate_chunks (
                                 evw_modify.send(PendingModificationEvent { chunk: visited_chunk_pos });
                             }
 
-                            let mut local_seed = (**seed as u64).wrapping_mul(point.x as u64).wrapping_mul(point.y as u64).wrapping_mul(point.z as u64);
+                            let local_seed = (**seed as u64).wrapping_mul(point.x.abs() as u64 + 1).wrapping_mul(point.y.abs() as u64 + 1).wrapping_mul(point.z.abs() as u64 + 1);
                             if Rng::with_seed(local_seed.wrapping_add(1)).f32() < up_chance {
                                 *expansion_points.last_mut().unwrap() = point.up(1);
                             }
@@ -172,11 +172,11 @@ pub fn generate_chunks (
                             //for adj in point.adj_6() {
 
                             //}
-                            up_chance -= 0.05;
+                            up_chance -= 0.075;
                             if up_chance < 0.50 {
-                                //up_chance = 0.0;
+                                up_chance = 0.0;
                                 branch_chance += 0.20 - branch_factor;
-                                terminate_chance += 0.05;
+                                terminate_chance += 0.01;
                             }
 
                             
@@ -231,9 +231,35 @@ pub fn generate_chunks (
 }
 
 pub fn read_modification_events (
+    //mut commands: Commands,
 
+    mut chunk_query: Query<(&mut Chunk)>,
+
+    //seed: Res<RNGSeed>,
+    chunk_map: Res<ChunkMap>,
+    mut pending_map: ResMut<PendingModificationMap>,
+
+    //mut evr_load_chunk: EventReader<LoadChunkEvent>,
+    mut evr_modify: EventReader<PendingModificationEvent>,
+
+    //mut loader_query: Query<(&mut ChunkLoader)>,
+
+    //mut loading_queue: ResMut<ChunkLoadingQueue>,
 ) {
-    todo!("We need modification events so that changes can happen to loaded chunks!");
+    for ev in evr_modify.read() {
+        if let Some(pending_chunk) = pending_map.get_mut(&ev.chunk) {
+            if let Some(chunk_entity) = chunk_map.get(&ev.chunk) {
+                if let Ok(mut chunk) = chunk_query.get_mut(*chunk_entity) {
+                    for (position, modification) in pending_chunk.iter_3d_mut() {
+                        if !modification.yield_to_terrain || chunk[position].id == BlockID::Air {
+                            chunk[position] = modification.block;
+                        }
+                    }
+                }
+            }
+            
+        }
+    }
 }
 
 pub fn unload_chunks (
