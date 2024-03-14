@@ -126,6 +126,9 @@ fn main () {
     )
     .add_plugins(WireframePlugin)
     .add_plugins(PhysicsPlugins::default())
+    //.insert_resource(NarrowPhaseConfig {
+    //    prediction_distance: 0.0,
+    //})
     //.insert_resource(Msaa::Sample4)
 
     .init_state::<GameState>()
@@ -322,7 +325,7 @@ pub fn setup(
     //mut materials: ResMut<Assets<StandardMaterial>>,
     //assets: Res<AssetServer>,
 ) {
-    let height = 1.2;
+    let height = 2.0;
 
     // Emotional support cube. Uncomment when needed.
     /*
@@ -340,7 +343,7 @@ pub fn setup(
     
     // Camera
     let camera = commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(0.0, (height * 1.0) / 2.0, 0.0),
+        transform: Transform::from_xyz(0.0, (height * 0.9) / 2.0, 0.0),
         ..default()
     })
     .id();
@@ -357,10 +360,10 @@ pub fn setup(
          */
         SpatialBundle::default(),
         // TODO: It feels like using a capsule causes the game to run worse??? but also: there's some weird bugginess with using a cylinder
-        movement::CharacterControllerBundle::new(Collider::capsule(height, 0.4)).with_movement(
+        movement::CharacterControllerBundle::new(Collider::cylinder(height, 0.4)).with_movement(
             30.0,
             0.92,
-            7.0,
+            6.0,
             (30.0 as Scalar).to_radians(),
         ),
         Friction::ZERO.with_combine_rule(CoefficientCombine::Min),

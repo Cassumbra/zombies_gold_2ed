@@ -183,9 +183,9 @@ pub fn movement(
                     linear_velocity.z += direction.y * movement_acceleration.0 * delta_time;
                 }
                 MovementType::Jump => {
-                    //if is_grounded {
+                    if is_grounded {
                         linear_velocity.y = jump_impulse.0;
-                    //}
+                    }
                 }
             }
         }
