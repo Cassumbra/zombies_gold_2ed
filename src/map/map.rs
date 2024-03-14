@@ -1,13 +1,14 @@
 use std::{collections::VecDeque, ops::{Range, RangeBounds}};
 use bevy::{math::Vec3A, prelude::*, utils::{HashMap, HashSet}};
 use fastrand::{Rng, choice};
+use itertools::Itertools;
 use sark_grids::Grid;
 //use grid_tree::OctreeU32;
-use noise::{core::worley::distance_functions::euclidean_squared, Blend, Constant, NoiseFn, Perlin, ScalePoint, Worley};
+use noise::{core::worley::{distance_functions::{self, euclidean, euclidean_squared}, worley_3d, ReturnType}, permutationtable::PermutationTable, Blend, Constant, NoiseFn, Perlin, ScalePoint, Worley};
 //use rand::{seq::SliceRandom, thread_rng};
 use derive_more::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign, };
 use bevy::{ecs::{entity::{EntityMapper, MapEntities}, reflect::ReflectMapEntities}, prelude::*};
-use crate::{grid3::Grid3, Item, ItemID, MoveToSpawn, RNGSeed, CHUNK_SIZE, WORLD_DEPTH, WORLD_HEIGHT, WORLD_SIZE};
+use crate::{directions::DIR_6, grid3::Grid3, point::GridPoint, Item, ItemID, MoveToSpawn, RNGSeed, CHUNK_SIZE, WORLD_DEPTH, WORLD_HEIGHT, WORLD_SIZE};
 
 use crate::sparse_grid3::SparseGrid3;
 
@@ -23,8 +24,10 @@ impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
         app
             .init_resource::<ChunkMap>()
+            .init_resource::<PendingModificationMap>()
             .init_resource::<ChunkLoadingQueue>()
-            .add_event::<LoadChunkEvent>();
+            .add_event::<LoadChunkEvent>()
+            .add_event::<PendingModificationEvent>();
     }
 }
  
@@ -35,8 +38,10 @@ pub fn generate_chunks (
 
     seed: Res<RNGSeed>,
     mut chunk_map: ResMut<ChunkMap>,
+    mut pending_map: ResMut<PendingModificationMap>,
 
     mut evr_load_chunk: EventReader<LoadChunkEvent>,
+    mut evw_modify: EventWriter<PendingModificationEvent>,
 
     mut loader_query: Query<(&mut ChunkLoader)>,
 
@@ -47,6 +52,8 @@ pub fn generate_chunks (
     let gradient = SingleDirectionAxialGradient { values: vec![1.0, 0.0, -0.5], points: vec![-(CHUNK_SIZE) as f64, 0.0, (WORLD_HEIGHT * CHUNK_SIZE) as f64], dimension: 1 };
 
     let noise_gen = Blend::new(ScalePoint::new(Perlin::new(**seed)).set_scale(0.025), gradient, Constant::new(0.7));
+
+    //let tree_noise = Worley::new(**seed).set_distance_function(euclidean_squared).set_return_type(ReturnType::Distance).set_frequency(0.025 );
 
     let mut chunks_to_load = Vec::new();
 
@@ -77,6 +84,7 @@ pub fn generate_chunks (
         }
     }
     
+    let mut modified_chunks = Vec::new();
 
     for ev in chunks_to_load.iter() {
         //println!("loading: {:?}", ev.chunk);
@@ -97,15 +105,111 @@ pub fn generate_chunks (
                 // Make our block grass instead of dirt if the block above is air.
                 if noise_gen.get([point_x, point_y + 1.0, point_z]) < 0.0 && point_y > 0.0 {
                     *block_val = Block::new(BlockID::Grass);
+
+                    // Tree!
+                    if Rng::with_seed((**seed as u64).wrapping_mul(point_x as u64).wrapping_mul(point_y as u64).wrapping_mul(point_z as u64)).f32() <= 0.10 {
+                        let mut visited_positions = Vec::<IVec3>::new();
+                        let mut expansion_points = vec![IVec3::new(point_x as i32, point_y as i32 + 1, point_z as i32)];
+                        let mut up_chance = 1.0;
+                        let mut terminate_chance = 0.0;
+                        let mut branch_chance = 0.0;
+                        let mut branch_factor = 0.0;
+
+                        while !expansion_points.is_empty() {
+                            let point = expansion_points[expansion_points.len() - 1];
+
+                            visited_positions.push(point);
+                            let visited_chunk_pos = chunk_pos_from_global(point);
+                            let visited_block_pos = block_pos_from_global(point);
+
+                            if !pending_map.contains_key(&visited_chunk_pos) {
+                                pending_map.insert(visited_chunk_pos, Grid3::new([CHUNK_SIZE; 3]));
+                            }
+
+                            pending_map.get_mut(&visited_chunk_pos).unwrap()[visited_block_pos] = PendingModification{ yield_to_terrain: true, block: Block::new(BlockID::Log) };
+                            if up_chance < 0.50 {
+                                for adj in point.adj_6() {
+                                    let visited_chunk_pos = chunk_pos_from_global(adj);
+                                    let visited_block_pos = block_pos_from_global(adj);
+
+                                    if !pending_map.contains_key(&visited_chunk_pos) {
+                                        pending_map.insert(visited_chunk_pos, Grid3::new([CHUNK_SIZE; 3]));
+                                    }
+                                    if pending_map[&visited_chunk_pos][visited_block_pos].block.id == BlockID::Air {
+                                        pending_map.get_mut(&visited_chunk_pos).unwrap()[visited_block_pos] = PendingModification{ yield_to_terrain: true, block: Block::new(BlockID::Leaves) };
+                                    }
+                                }
+                            }
+
+                            if !modified_chunks.contains(&visited_chunk_pos) {
+                                modified_chunks.push(visited_chunk_pos);
+                                evw_modify.send(PendingModificationEvent { chunk: visited_chunk_pos });
+                            }
+
+                            let mut local_seed = (**seed as u64).wrapping_mul(point.x as u64).wrapping_mul(point.y as u64).wrapping_mul(point.z as u64);
+                            if Rng::with_seed(local_seed.wrapping_add(1)).f32() < up_chance {
+                                *expansion_points.last_mut().unwrap() = point.up(1);
+                            }
+                            else if Rng::with_seed(local_seed.wrapping_add(2)).f32() < branch_chance {
+                                expansion_points.push(point);
+                                terminate_chance = 0.0;
+                                branch_chance = 0.0;
+                                branch_factor += 0.02;
+                            }
+                            else if Rng::with_seed(local_seed.wrapping_add(3)).f32() < terminate_chance {
+                                expansion_points.pop();
+                            }
+                            else {
+                                let choices = point.adj_6().filter(|p| !visited_positions.contains(p)).collect_vec();
+                                if let Some(choice) = Rng::with_seed(local_seed.wrapping_add(4)).choice(choices) {
+                                    *expansion_points.last_mut().unwrap() = choice;
+                                }
+                                else {
+                                    expansion_points.pop();
+                                }
+                            }
+                            //let direction = Rng::with_seed((**seed) as u64).choice(DIR_6);
+                            //for adj in point.adj_6() {
+
+                            //}
+                            up_chance -= 0.05;
+                            if up_chance < 0.50 {
+                                //up_chance = 0.0;
+                                branch_chance += 0.20 - branch_factor;
+                                terminate_chance += 0.05;
+                            }
+
+                            
+                        }
+                        //for visited_pos in visited_positions {
+                            
+                        //    if let
+                        //}
+
+                    }
                 }
                 if (noise_gen.get([point_x, point_y + 5.0, point_z]) > 0.0) || point_y < -5.0 {
                     *block_val = Block::new(BlockID::Stone);
                 }
             }
+
+            //let tree_noise_val = tree_noise.get([point_x, point_y, point_z]);
+            //println!("tree noise value: {}", tree_noise_val);
+            //if tree_noise_val > 0.0 {
+            //    *block_val = Block::new(BlockID::Log);
+            //}
             //let stone_noise_val = stone_noise.get([point_x, point_y, point_z]);
             //if stone_noise_val >= 0.05 {
             //    *block_val = Block::new(BlockID::Stone);
             //}
+        }
+
+        if let Some(pending_chunk) = pending_map.get_mut(&ev.chunk) {
+            for (position, modification) in pending_chunk.iter_3d_mut() {
+                if !modification.yield_to_terrain || chunk[position].id == BlockID::Air {
+                    chunk[position] = modification.block;
+                }
+            }
         }
         
         let chunk_entity = commands.spawn(chunk)
@@ -124,6 +228,12 @@ pub fn generate_chunks (
     }
 
     //next_mapgen_state.set(MapGenState::TempBand);
+}
+
+pub fn read_modification_events (
+
+) {
+    todo!("We need modification events so that changes can happen to loaded chunks!");
 }
 
 pub fn unload_chunks (
@@ -224,9 +334,28 @@ pub struct LoadChunkEvent {
     pub load_reason: LoadReason,
 }
 
+#[derive(Clone, Copy, Event)]
+pub struct PendingModificationEvent {
+    pub chunk: IVec3,
+}
+
 #[derive(Default, Clone, Deref, DerefMut, Resource)]
 pub struct ChunkMap(HashMap<IVec3, Entity>);
 
+#[derive(Clone)]
+pub struct PendingModification {
+    /// True if terrain generation takes priority over our modification.
+    yield_to_terrain: bool,
+    block: Block,
+}
+impl Default for PendingModification {
+    fn default() -> Self {
+        Self { yield_to_terrain: true, block: Default::default() }
+    }
+}
+
+#[derive(Default, Clone, Deref, DerefMut, Resource)]
+pub struct PendingModificationMap(HashMap<IVec3, Grid3<PendingModification>>);
 
 /// Denotes that an entity loads chunks around itself.
 #[derive(Default, Clone, Component)]
@@ -278,6 +407,7 @@ pub enum BlockID {
     Stone,
     StoneBrick,
     Log,
+    Leaves,
 }
 impl BlockID {
     pub fn get_attributes(self) -> BlockAttributes {
@@ -288,7 +418,9 @@ impl BlockID {
             BlockID::Stone => BlockAttributes { health: 5, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 2)), give_on_damage: Some(Item{ id: ItemID::Stone, amount: 16, }), ..default() },
             BlockID::StoneBrick => BlockAttributes { health: 5, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 3)), give_on_damage: Some(Item{ id: ItemID::Stone, amount: 2 }), cost_to_build: [Some(Item::new(ItemID::Stone, 16)), None, None],  ..default() },
             // Logs will have special behavior for how they get mined, most likely. (Treefelling)
-            BlockID::Log => BlockAttributes { health: 2, ..default() },
+            BlockID::Log => BlockAttributes { health: 1, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 4)), ..default() },
+            BlockID::Leaves => BlockAttributes { health: 1, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 5)), ..default() },
+
             
         }
     }

@@ -13,22 +13,19 @@ use block_mesh::ndshape::{ConstShape, ConstShape3u32};
 use block_mesh::{greedy_quads, visible_block_faces, GreedyQuadsBuffer, MergeVoxel, UnitQuadBuffer, UnorientedQuad, Voxel, VoxelVisibility, RIGHT_HANDED_Y_UP_CONFIG};
 
 #[derive(Clone, Copy, Eq, PartialEq)]
-struct BoolVoxel(bool);
+struct VisVoxel(VoxelVisibility);
 
-const EMPTY: BoolVoxel = BoolVoxel(false);
-const FULL: BoolVoxel = BoolVoxel(true);
+const EMPTY: VisVoxel = VisVoxel(VoxelVisibility::Empty);
+const TRANSLUCENT: VisVoxel = VisVoxel(VoxelVisibility::Translucent);
+const FULL: VisVoxel = VisVoxel(VoxelVisibility::Opaque);
 
-impl Voxel for BoolVoxel {
+impl Voxel for VisVoxel {
     fn get_visibility(&self) -> VoxelVisibility {
-        if *self == EMPTY {
-            VoxelVisibility::Empty
-        } else {
-            VoxelVisibility::Opaque
-        }
+        self.0
     }
 }
 
-impl MergeVoxel for BoolVoxel {
+impl MergeVoxel for VisVoxel {
     type MergeValue = Self;
 
     fn merge_value(&self) -> Self::MergeValue {
@@ -63,6 +60,8 @@ pub fn update_chunk_meshes (
         for (i, block) in chunk.iter_3d() {
             voxels[ChunkShape::linearize([(i.x + 1) as u32, (i.y + 1) as u32, (i.z + 1) as u32]) as usize] = match block.id {
                 crate::BlockID::Air => EMPTY,
+                // TODO: We should make this use our attributes, later, once we have more blocks that are translucent.
+                crate::BlockID::Leaves => TRANSLUCENT,
                 _ => FULL
             }
         }
@@ -163,6 +162,7 @@ pub fn update_chunk_meshes (
         // TODO: Should we be reusing this material instead of remaking it every time?
         let mut material = StandardMaterial::from(Color::WHITE);
         material.unlit = true;
+        material.alpha_mode = AlphaMode::Mask(0.0);
         material.base_color_texture = Some(atlas.res_8x8.clone());
 
         // Some quads were generated.

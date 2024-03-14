@@ -237,7 +237,9 @@ pub fn move_to_spawn (
             continue 'entity_checks
         }
 
-        todo!("We need to try some other spawn locations!");
+        transform.translation = IVec3::new(SPAWN_CHUNK.x * CHUNK_SIZE, WORLD_HEIGHT * CHUNK_SIZE + 2, SPAWN_CHUNK.z * CHUNK_SIZE).as_vec3();
+        commands.entity(entity).remove::<MoveToSpawn>();
+        //todo!("We need to try some other spawn locations!");
     }
 }
 
