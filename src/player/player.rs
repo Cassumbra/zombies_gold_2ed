@@ -6,6 +6,8 @@ use std::f32::consts::PI;
 use bevy::input::{ButtonState, keyboard::KeyboardInput};
 use bevy::window::{CursorGrabMode, PrimaryWindow};
 use bevy::{math, prelude::*};
+use bevy_tnua::builtins::{TnuaBuiltinJump, TnuaBuiltinWalk};
+use bevy_tnua::controller::TnuaController;
 use bevy_xpbd_3d::components::LinearVelocity;
 use bevy_xpbd_3d::math::{Scalar, Vector2};
 use leafwing_input_manager::action_state::ActionState;
@@ -13,7 +15,7 @@ use leafwing_input_manager::input_mocking::QueryInput;
 
 use crate::movement::{Grounded, JumpImpulse, MovementAcceleration, MovementAction, MovementType};
 use crate::point::Point3d;
-use crate::{Action, BuildingEvent, MiningEvent};
+use crate::{Action, BuildingEvent, MiningEvent, PLAYER_HEIGHT};
 
 //use crate::rendering::window::WindowChangeEvent;
 
@@ -26,7 +28,7 @@ pub struct Player;
 /// Player input.
 pub fn player_input_game (
     //query: Query<(Entity, &ActionState<Action>, &MovementAcceleration, &JumpImpulse, &mut LinearVelocity, Has<Grounded>,), (With<Player>)>,
-    mut query: Query<(Entity, &ActionState<Action>, &mut Transform, &Children), (With<Player>)>,
+    mut query: Query<(Entity, &ActionState<Action>, &mut Transform, &mut TnuaController, &Children), (With<Player>)>,
     mut cam_query: Query<(&mut Transform), (Without<Player>)>,
     
     mut evw_movement: EventWriter<MovementAction>,
@@ -36,7 +38,7 @@ pub fn player_input_game (
     mut primary_window: Query<&mut Window, With<PrimaryWindow>>
 ) {
     // TODO: Perhaps we should send events for movement instead of moving directly?
-    if let Ok((player, action_state, mut transform, children)) = query.get_single_mut() {
+    if let Ok((player, action_state, mut transform, mut controller, children)) = query.get_single_mut() {
         //println!("{:?}", transform.translation());
         // Modified from bevy_xpbd's examples + bevy_flycam
         let forward = Vec3::from(transform.forward());
@@ -55,6 +57,29 @@ pub fn player_input_game (
         }
         if action_state.pressed(&Action::MoveLeft) {
             direction -= right;
+        }
+
+        // Feed the basis every frame. Even if the player doesn't move - just use `desired_velocity:
+        // Vec3::ZERO`. `TnuaController` starts without a basis, which will make the character collider
+        // just fall.
+        controller.basis(TnuaBuiltinWalk {
+            // The `desired_velocity` determines how the character will move.
+            desired_velocity: direction.normalize_or_zero() * 4.0,
+            // The `float_height` must be greater (even if by little) from the distance between the
+            // character's center and the lowest point of its collider.
+            float_height: PLAYER_HEIGHT * 0.55,
+            // `TnuaBuiltinWalk` has many other fields for customizing the movement - but they have
+            // sensible defaults. Refer to the `TnuaBuiltinWalk`'s documentation to learn what they do.
+            ..Default::default()
+        });
+
+        if action_state.pressed(&Action::Jump) {
+            controller.action(TnuaBuiltinJump {
+                // The height is the only mandatory field of the jump button.
+                height: 1.5,
+                // `TnuaBuiltinJump` also has customization fields with sensible defaults.
+                ..Default::default()
+            });
         }
 
         
@@ -104,16 +129,12 @@ pub fn player_input_game (
             
         }
         
-
-        //direction = direction.normalize_or_zero();
-
+        /*
         if direction != Vec3::ZERO {
             evw_movement.send(MovementAction::new(player, MovementType::Move(Vec2::new(direction.x, direction.z)) ));
         }
-
-        if action_state.pressed(&Action::Jump) {
-            evw_movement.send(MovementAction::new(player, MovementType::Jump));
-        }
+         */
+        
     }   
 }
 

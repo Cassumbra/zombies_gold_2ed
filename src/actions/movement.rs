@@ -2,7 +2,9 @@
 // Some modifications will be made as needed.
 
 use bevy::{ecs::query::Has, prelude::*, transform};
-use bevy_xpbd_3d::{math::*, prelude::*};
+use bevy_xpbd_3d::{math::*, parry::shape::SharedShape, prelude::*};
+
+use crate::{Player, PLAYER_HEIGHT, PLAYER_WIDTH};
 
 
 

@@ -18,7 +18,9 @@ use leafwing_input_manager::prelude::*;
 use moonshine_save::{save::SavePlugin, load::LoadPlugin};
 use bevy::render::settings::WgpuSettings;
 
-//use sark_grids::Grid;
+use bevy_tnua::prelude::*;
+use bevy_tnua_xpbd3d::*;
+
 
 #[path = "spatial/spatial.rs"]
 mod spatial;
@@ -106,6 +108,9 @@ const WORLD_HEIGHT: i32 = 4;
 /// Underground depth.
 const WORLD_DEPTH: i32 = 12;
 
+const PLAYER_HEIGHT: f32 = 1.4;
+const PLAYER_WIDTH: f32 = 0.4;
+
 
 
 fn main () {
@@ -126,9 +131,13 @@ fn main () {
     )
     .add_plugins(WireframePlugin)
     .add_plugins(PhysicsPlugins::default())
-    //.insert_resource(NarrowPhaseConfig {
-    //    prediction_distance: 0.0,
-    //})
+    .add_plugins((
+        TnuaControllerPlugin,
+        TnuaXpbd3dPlugin,
+    ))
+    .insert_resource(NarrowPhaseConfig {
+        prediction_distance: 0.0,
+    })
     //.insert_resource(Msaa::Sample4)
 
     .init_state::<GameState>()
@@ -178,7 +187,8 @@ fn main () {
     .add_systems(Update, building)
     .add_systems(Update, place_block)
     
-    
+    .add_systems(Update, player_input_game)
+    /*
     .add_systems(
         Update,
         (
@@ -189,7 +199,8 @@ fn main () {
         )
             .chain(),
     )
-    
+     */
+
     /*
     .add_systems(PostUpdate, save_game()
         .include_resource::<animated_tiles::ScrollingNoiseSpeed>()
@@ -325,7 +336,6 @@ pub fn setup(
     //mut materials: ResMut<Assets<StandardMaterial>>,
     //assets: Res<AssetServer>,
 ) {
-    let height = 2.0;
 
     // Emotional support cube. Uncomment when needed.
     /*
@@ -343,7 +353,7 @@ pub fn setup(
     
     // Camera
     let camera = commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(0.0, (height * 0.9) / 2.0, 0.0),
+        transform: Transform::from_xyz(0.0, (PLAYER_HEIGHT * 0.9) / 2.0, 0.0),
         ..default()
     })
     .id();
@@ -359,16 +369,22 @@ pub fn setup(
         },
          */
         SpatialBundle::default(),
-        // TODO: It feels like using a capsule causes the game to run worse??? but also: there's some weird bugginess with using a cylinder
-        movement::CharacterControllerBundle::new(Collider::cylinder(height, 0.4)).with_movement(
-            30.0,
-            0.92,
-            6.0,
-            (30.0 as Scalar).to_radians(),
-        ),
-        Friction::ZERO.with_combine_rule(CoefficientCombine::Min),
-        Restitution::ZERO.with_combine_rule(CoefficientCombine::Min),
-        GravityScale(2.0),
+        //Friction::ZERO.with_combine_rule(CoefficientCombine::Min),
+        //Restitution::ZERO.with_combine_rule(CoefficientCombine::Min),
+        //GravityScale(2.0),
+
+        // The player character needs to be configured as a dynamic rigid body of the physics
+        // engine.
+        RigidBody::Dynamic,
+        Collider::capsule(PLAYER_HEIGHT * 0.45, PLAYER_WIDTH),
+        // This bundle holds the main components.
+        TnuaControllerBundle::default(),
+        // A sensor shape is not strictly necessary, but without it we'll get weird results.
+        TnuaXpbd3dSensorShape(Collider::cylinder(0.0, PLAYER_WIDTH - 0.01)),
+        // Tnua can fix the rotation, but the character will still get rotated before it can do so.
+        // By locking the rotation we can prevent this.
+        LockedAxes::ROTATION_LOCKED,
+
         Player,
         MoveToSpawn,
         InputManagerBundle::<Action> {
