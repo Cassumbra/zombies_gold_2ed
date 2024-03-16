@@ -106,7 +106,8 @@ const WORLD_HEIGHT: i32 = 4;
 /// Underground depth.
 const WORLD_DEPTH: i32 = 12;
 
-
+const PLAYER_HEIGHT: f32 = 1.4;
+const PLAYER_WIDTH: f32 = 0.4;
 
 fn main () {
     App::new()
@@ -183,7 +184,7 @@ fn main () {
         Update,
         (
             player_input_game,
-            movement::update_grounded,
+            movement::update_floating_collider,
             movement::movement,
             movement::apply_movement_damping,
         )
@@ -343,7 +344,7 @@ pub fn setup(
     
     // Camera
     let camera = commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(0.0, (height * 0.9) / 2.0, 0.0),
+        transform: Transform::from_xyz(0.0, (PLAYER_HEIGHT * 0.9) / 2.0, 0.0),
         ..default()
     })
     .id();
@@ -360,10 +361,10 @@ pub fn setup(
          */
         SpatialBundle::default(),
         // TODO: It feels like using a capsule causes the game to run worse??? but also: there's some weird bugginess with using a cylinder
-        movement::CharacterControllerBundle::new(Collider::cylinder(height, 0.4)).with_movement(
-            30.0,
+        movement::CharacterControllerBundle::new(Collider::capsule(PLAYER_HEIGHT * 0.5, 0.4)).with_movement(
+            20.0,
             0.92,
-            6.0,
+            5.0,
             (30.0 as Scalar).to_radians(),
         ),
         Friction::ZERO.with_combine_rule(CoefficientCombine::Min),

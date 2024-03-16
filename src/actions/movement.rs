@@ -4,6 +4,8 @@
 use bevy::{ecs::query::Has, prelude::*, transform};
 use bevy_xpbd_3d::{math::*, prelude::*};
 
+use crate::{Player, PLAYER_HEIGHT, PLAYER_WIDTH};
+
 
 
 
@@ -138,7 +140,6 @@ pub fn update_grounded(
         With<CharacterController>,
     >,
 ) {
-    //println!("sbeeef");
     for (entity, hits, rotation, max_slope_angle) in &mut query {
         // The character is grounded if the shape caster has a hit with a normal
         // that isn't too steep.
@@ -156,6 +157,33 @@ pub fn update_grounded(
             commands.entity(entity).remove::<Grounded>();
         }
     }
+}
+
+pub fn update_floating_collider (
+    mut commands: Commands,
+    mut query: Query<(Entity, &GlobalTransform, &mut LinearVelocity, &Collider), With<CharacterController>>,
+    spatial_query: SpatialQuery,
+) {
+    let strength = 0.75;
+    let dampening = 0.1;
+
+    for (entity, global_transform, mut linear_velocity, _collider) in &mut query {
+        if let Some(hit) = spatial_query.cast_shape(&Collider::cylinder(PLAYER_HEIGHT * 0.5, PLAYER_WIDTH - 0.01), global_transform.translation(), Quat::default(), Direction3d::new_unchecked(Vec3::NEG_Y), PLAYER_HEIGHT * 1.0, false, SpatialQueryFilter::from_excluded_entities(vec![entity]), ) {
+            //println!("hit: {:?}", hit);
+            //fallDur = 0.0; // same as grounded = true; but allows coyote time
+            if hit.time_of_impact < PLAYER_HEIGHT * 0.5 {
+                commands.entity(entity).insert(Grounded);
+            }
+            //if hit.normal.dot(Vec3::Y) > 0.95 { // keep if you care about steep slopes
+                let lv = linear_velocity.clone();
+                **linear_velocity += Vec3::Y * (((PLAYER_HEIGHT * 0.5 - hit.time_of_impact) * strength) - (lv.dot(Vec3::Y) * dampening)); 
+            //} 
+        }
+        else {
+            commands.entity(entity).remove::<Grounded>();
+        }
+    }
+    
 }
 
 /// Responds to [`MovementAction`] events and moves character controllers accordingly.

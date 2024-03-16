@@ -202,7 +202,7 @@ pub fn building (
                         5.0,                         
                         1,                             
                         true,                          
-                        SpatialQueryFilter::default().with_excluded_entities(vec![entity]), 
+                        SpatialQueryFilter::from_excluded_entities(vec![entity]),
                     ) {
                         let hit_point = global_transform.translation() + global_transform.forward() * hit.time_of_impact;
                         let hit_coords = (hit_point + hit.normal / 2.0).round().as_ivec3();
