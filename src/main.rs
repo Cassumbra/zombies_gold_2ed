@@ -135,9 +135,9 @@ fn main () {
         TnuaControllerPlugin,
         TnuaXpbd3dPlugin,
     ))
-    .insert_resource(NarrowPhaseConfig {
-        prediction_distance: 0.0,
-    })
+    //.insert_resource(NarrowPhaseConfig {
+    //    prediction_distance: 0.0,
+    //})
     //.insert_resource(Msaa::Sample4)
 
     .init_state::<GameState>()

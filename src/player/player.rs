@@ -65,6 +65,8 @@ pub fn player_input_game (
         controller.basis(TnuaBuiltinWalk {
             // The `desired_velocity` determines how the character will move.
             desired_velocity: direction.normalize_or_zero() * 4.0,
+            acceleration: 10.0,
+            air_acceleration: 5.0,
             // The `float_height` must be greater (even if by little) from the distance between the
             // character's center and the lowest point of its collider.
             float_height: PLAYER_HEIGHT * 0.55,
@@ -77,6 +79,8 @@ pub fn player_input_game (
             controller.action(TnuaBuiltinJump {
                 // The height is the only mandatory field of the jump button.
                 height: 1.5,
+                fall_extra_gravity: 10.0,
+                reschedule_cooldown: Some(0.0),
                 // `TnuaBuiltinJump` also has customization fields with sensible defaults.
                 ..Default::default()
             });
