@@ -8,9 +8,6 @@ edition = "2021"
 [dependencies]
 # Bevy stuff
 bevy = "0.13"
-bevy_xpbd_3d = "0.4.2"
-bevy-tnua = "0.15.0"
-bevy-tnua-xpbd3d = "0.2.0"
 moonshine-save = "0.3.5"
 leafwing-input-manager = "0.13"
 bevy_asset_loader = "0.20.0"

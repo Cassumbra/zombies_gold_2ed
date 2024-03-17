@@ -8,18 +8,12 @@
 
 #![feature(const_fn_floating_point_arithmetic)]
 
-use std::mem::size_of;
-
-use bevy::{app::AppExit, ecs::schedule::ScheduleLabel, pbr::wireframe::WireframePlugin, prelude::*, render::{settings::{RenderCreation, WgpuFeatures}, RenderPlugin}, window::{exit_on_all_closed, exit_on_primary_closed}};
+use bevy::{app::AppExit, ecs::schedule::ScheduleLabel, pbr::wireframe::WireframePlugin, prelude::*};
 use bevy_asset_loader::prelude::*;
 //use bevy_flycam::PlayerPlugin;
-use bevy_xpbd_3d::{math::{Scalar, Vector}, prelude::*};
 use leafwing_input_manager::prelude::*;
 use moonshine_save::{save::SavePlugin, load::LoadPlugin};
-use bevy::render::settings::WgpuSettings;
-
-use bevy_tnua::prelude::*;
-use bevy_tnua_xpbd3d::*;
+//use bevy::render::settings::WgpuSettings;
 
 
 #[path = "spatial/spatial.rs"]
@@ -45,6 +39,9 @@ use log::*;
 mod map;
 use map::*;
 
+#[path = "physics/physics.rs"]
+mod physics;
+use physics::*;
 
 #[path = "player/player.rs"]
 mod player;
@@ -130,11 +127,6 @@ fn main () {
         .set(ImagePlugin::default_nearest())
     )
     .add_plugins(WireframePlugin)
-    .add_plugins(PhysicsPlugins::default())
-    .add_plugins((
-        TnuaControllerPlugin,
-        TnuaXpbd3dPlugin,
-    ))
     //.insert_resource(NarrowPhaseConfig {
     //    prediction_distance: 0.0,
     //})
@@ -180,26 +172,25 @@ fn main () {
     .add_systems(Update, map::unload_chunks)
 
     .add_systems(Update, rendering::update_chunk_meshes.run_if(in_state(GameState::Playing)))
-    .add_systems(Update, update_chunk_colliders)
     .add_systems(Update, move_to_spawn.run_if(in_state(GameState::Playing)))
-    .add_systems(Update, mining)
-    .add_systems(Update, damage_block)
-    .add_systems(Update, building)
-    .add_systems(Update, place_block)
+    //.add_systems(Update, mining)
+    //.add_systems(Update, damage_block)
+    //.add_systems(Update, building)
+    //.add_systems(Update, place_block)
     
     .add_systems(Update, player_input_game)
-    /*
+    
     .add_systems(
         Update,
         (
             player_input_game,
-            movement::update_grounded,
             movement::movement,
             movement::apply_movement_damping,
+            do_physics,
         )
             .chain(),
     )
-     */
+     
 
     /*
     .add_systems(PostUpdate, save_game()
@@ -298,37 +289,6 @@ pub fn app_exit (mut events: EventReader<AppExit>) -> bool {
 }
 
 
-pub fn update_chunk_colliders (
-    mut commands: Commands,
-
-    query: Query<(Entity, &Chunk), Or<(Added<Chunk>, Changed<Chunk>)>>,
-) {
-    for (entity, chunk) in &query {
-        //if commands.get_entity(entity).is_none() {
-        //    continue
-        //}
-
-        // TODO: Optimize this. we don't need colliders if a block is touching air.
-        let colliders: Vec::<(Vector, Quat, Collider)> = chunk.iter_3d().filter_map(|(position, block)| {
-            if block.id != BlockID::Air {
-                Some((Vector::from(position.as_vec3()), Quat::IDENTITY, Collider::cuboid(1.0, 1.0, 1.0)))
-            }
-            else {
-                None
-            }
-            
-        
-        }).collect();
-
-        if !colliders.is_empty() {
-            commands.entity(entity)
-            .try_insert(Collider::compound(colliders))
-            .try_insert(RigidBody::Static);
-        }
-    }
-}
-
-
 
 pub fn setup(
     mut commands: Commands,
@@ -369,22 +329,12 @@ pub fn setup(
         },
          */
         SpatialBundle::default(),
-        //Friction::ZERO.with_combine_rule(CoefficientCombine::Min),
-        //Restitution::ZERO.with_combine_rule(CoefficientCombine::Min),
-        //GravityScale(2.0),
-
-        // The player character needs to be configured as a dynamic rigid body of the physics
-        // engine.
-        RigidBody::Dynamic,
-        Collider::capsule(PLAYER_HEIGHT * 0.45, PLAYER_WIDTH),
-        // This bundle holds the main components.
-        TnuaControllerBundle::default(),
-        // A sensor shape is not strictly necessary, but without it we'll get weird results.
-        TnuaXpbd3dSensorShape(Collider::cylinder(0.0, PLAYER_WIDTH - 0.01)),
-        // Tnua can fix the rotation, but the character will still get rotated before it can do so.
-        // By locking the rotation we can prevent this.
-        LockedAxes::ROTATION_LOCKED,
-
+        movement::CharacterControllerBundle::new(AabbCollider::new(PLAYER_WIDTH, PLAYER_HEIGHT, PLAYER_WIDTH)).with_movement(
+            30.0,
+            0.92,
+            6.0,
+        ),
+        LinearVelocity::default(),
         Player,
         MoveToSpawn,
         InputManagerBundle::<Action> {

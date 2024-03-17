@@ -4,8 +4,6 @@ use bevy::prelude::*;
 use bevy::render::mesh::{Indices, MeshVertexAttribute, PrimitiveTopology, VertexAttributeValues};
 use bevy::render::render_asset::RenderAssetUsages;
 use bevy::render::view::NoFrustumCulling;
-use bevy_xpbd_3d::components::RigidBody;
-use bevy_xpbd_3d::plugins::collision::{Collider, ColliderAabb};
 
 use crate::{Atlas, Chunk, TextureAtlas, CHUNK_SIZE};
 

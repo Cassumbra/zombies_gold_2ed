@@ -2,11 +2,8 @@
 // Some modifications will be made as needed.
 
 use bevy::{ecs::query::Has, prelude::*, transform};
-use bevy_xpbd_3d::{math::*, parry::shape::SharedShape, prelude::*};
 
-use crate::{Player, PLAYER_HEIGHT, PLAYER_WIDTH};
-
-
+use crate::{AabbCollider, LinearVelocity, Player, PLAYER_HEIGHT, PLAYER_WIDTH};
 
 
 
@@ -23,7 +20,7 @@ impl MovementAction {
 }
 
 pub enum MovementType {
-    Move(Vector2),
+    Move(Vec2),
     Jump,
 }
 
@@ -37,31 +34,24 @@ pub struct CharacterController;
 pub struct Grounded;
 /// The acceleration used for character movement.
 #[derive(Component)]
-pub struct MovementAcceleration(Scalar);
+pub struct MovementAcceleration(f32);
 
 /// The damping factor used for slowing down movement.
 #[derive(Component)]
-pub struct MovementDampingFactor(Scalar);
+pub struct MovementDampingFactor(f32);
 
 /// The strength of a jump.
 #[derive(Component)]
-pub struct JumpImpulse(Scalar);
-
-/// The maximum angle a slope can have for a character controller
-/// to be able to climb and jump. If the slope is steeper than this angle,
-/// the character will slide down.
-#[derive(Component)]
-pub struct MaxSlopeAngle(Scalar);
+pub struct JumpImpulse(f32);
 
 /// A bundle that contains the components needed for a basic
 /// kinematic character controller.
 #[derive(Bundle)]
 pub struct CharacterControllerBundle {
     character_controller: CharacterController,
-    rigid_body: RigidBody,
-    collider: Collider,
-    ground_caster: ShapeCaster,
-    locked_axes: LockedAxes,
+    collider: AabbCollider,
+    //ground_caster: ShapeCaster,
+    //locked_axes: LockedAxes,
     movement: MovementBundle,
 }
 
@@ -71,41 +61,36 @@ pub struct MovementBundle {
     acceleration: MovementAcceleration,
     damping: MovementDampingFactor,
     jump_impulse: JumpImpulse,
-    max_slope_angle: MaxSlopeAngle,
 }
 
 impl MovementBundle {
     pub const fn new(
-        acceleration: Scalar,
-        damping: Scalar,
-        jump_impulse: Scalar,
-        max_slope_angle: Scalar,
+        acceleration: f32,
+        damping: f32,
+        jump_impulse: f32,
     ) -> Self {
         Self {
             acceleration: MovementAcceleration(acceleration),
             damping: MovementDampingFactor(damping),
             jump_impulse: JumpImpulse(jump_impulse),
-            max_slope_angle: MaxSlopeAngle(max_slope_angle),
         }
     }
 }
 
 impl Default for MovementBundle {
     fn default() -> Self {
-        Self::new(30.0, 0.9, 7.0, PI * 0.45)
+        Self::new(30.0, 0.9, 7.0)
     }
 }
 
 impl CharacterControllerBundle {
-    pub fn new(collider: Collider) -> Self {
-        // Create shape caster as a slightly smaller version of collider
-        let mut caster_shape = collider.clone();
-        caster_shape.set_scale(Vector::ONE * 0.99, 10);
+    pub fn new(collider: AabbCollider) -> Self {
+        //caster_shape.set_scale(Vec3::ONE * 0.99, 10);
 
         Self {
             character_controller: CharacterController,
-            rigid_body: RigidBody::Dynamic,
             collider,
+            /*
             ground_caster: ShapeCaster::new(
                 caster_shape,
                 Vector::ZERO,
@@ -113,19 +98,18 @@ impl CharacterControllerBundle {
                 Direction3d::NEG_Y,
             )
             .with_max_time_of_impact(0.2),
-            locked_axes: LockedAxes::ROTATION_LOCKED,
+             */
             movement: MovementBundle::default(),
         }
     }
 
     pub fn with_movement(
         mut self,
-        acceleration: Scalar,
-        damping: Scalar,
-        jump_impulse: Scalar,
-        max_slope_angle: Scalar,
+        acceleration: f32,
+        damping: f32,
+        jump_impulse: f32,
     ) -> Self {
-        self.movement = MovementBundle::new(acceleration, damping, jump_impulse, max_slope_angle);
+        self.movement = MovementBundle::new(acceleration, damping, jump_impulse);
         self
     }
 }
@@ -133,6 +117,7 @@ impl CharacterControllerBundle {
 
 
 /// Updates the [`Grounded`] status for character controllers.
+/*
 pub fn update_grounded(
     mut commands: Commands,
     mut query: Query<
@@ -159,6 +144,7 @@ pub fn update_grounded(
         }
     }
 }
+ */
 
 /// Responds to [`MovementAction`] events and moves character controllers accordingly.
 pub fn movement(
@@ -172,9 +158,7 @@ pub fn movement(
         &Transform
     )>,
 ) {
-    // Precision is adjusted so that the example works with
-    // both the `f32` and `f64` features. Otherwise you don't need this.
-    let delta_time = time.delta_seconds_f64().adjust_precision();
+    let delta_time = time.delta_seconds();
 
     for event in movement_event_reader.read() {
         

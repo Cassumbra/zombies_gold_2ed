@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 
-use bevy_xpbd_3d::plugins::spatial_query::{self, SpatialQuery, SpatialQueryFilter};
 use movement::*;
 
 use crate::{block_pos_from_global, chunk_pos_from_global, Block, BlockID, Chunk, ChunkMap, Inventory, CHUNK_SIZE};
@@ -73,7 +72,7 @@ impl Default for BuildingTimer {
     }
 }
 
-
+/*
 pub fn mining (
     //mut commands: Commands,
 
@@ -272,3 +271,4 @@ pub fn place_block (
         }
     }
 }
+ */
