@@ -1,4 +1,5 @@
 use bevy::{prelude::*, utils::HashSet};
+use itertools::{iproduct, izip};
 
 use crate::{block_pos_from_global, chunk_pos_from_global, BlockID, Chunk, ChunkMap};
 
@@ -18,29 +19,29 @@ pub fn do_physics(
         transform.translation += **velocity * time.delta_seconds();
 
         if let Some(collider) = opt_collider {
-            for x in (transform.translation.x as i32 - 3)..=(transform.translation.x as i32 + 3) {
-                for y in (transform.translation.y as i32 - 3)..=(transform.translation.y as i32 + 3) {
-                    for z in (transform.translation.z as i32 - 3)..=(transform.translation.z as i32 + 3) {
-                        let global_block_position = IVec3::new(x, y, z);
-                        let chunk_position = chunk_pos_from_global(global_block_position);
-                        let block_position = block_pos_from_global(global_block_position);
-    
-                        if let Some(chunk_entity) = chunk_map.get(&chunk_position) {
-                            if let Ok(chunk) = chunk_query.get(*chunk_entity) {
-                                if chunk[block_position].id != BlockID::Air {
-                                    let (penetration, normal) = collider.get_penetration_and_normal(transform.translation, BLOCK_AABB, global_block_position.as_vec3());
-                                    if normal != Vec3::ZERO {
-                                        println!("Penetration: {}, Normal: {}", penetration, normal);
-                                    }
-                                }
-                                continue;
+            for (x, y, z) in iproduct!((transform.translation.x as i32 - 3)..=(transform.translation.x as i32 + 3), 
+                                       (transform.translation.y as i32 - 3)..=(transform.translation.y as i32 + 3),
+                                       (transform.translation.z as i32 - 3)..=(transform.translation.z as i32 + 3))
+            {
+                let global_block_position = IVec3::new(x, y, z);
+                let chunk_position = chunk_pos_from_global(global_block_position);
+                let block_position = block_pos_from_global(global_block_position);
+
+                if let Some(chunk_entity) = chunk_map.get(&chunk_position) {
+                    if let Ok(chunk) = chunk_query.get(*chunk_entity) {
+                        if chunk[block_position].id != BlockID::Air {
+                            let (penetration, normal) = collider.get_penetration_and_normal(transform.translation, BLOCK_AABB, global_block_position.as_vec3());
+                            if normal != Vec3::ZERO {
+                                println!("Penetration: {}, Normal: {}", penetration, normal);
+                                transform.translation += penetration * normal;
                             }
                         }
-                        // OOB check
-                        if collider.get_intersection(transform.translation, BLOCK_AABB, global_block_position.as_vec3()) {
-                            println!("OOB at {}", global_block_position);
-                        }
+                        continue;
                     }
+                }
+                // OOB check
+                if collider.get_intersection(transform.translation, BLOCK_AABB, global_block_position.as_vec3()) {
+                    println!("OOB at {}", global_block_position);
                 }
             }
         }
@@ -94,6 +95,7 @@ impl AabbCollider {
 
         // No idea how to properly credit this but: https://research.ncl.ac.uk/game/mastersdegree/gametechnologies/physicstutorials/4collisiondetection/Physics%20-%20Collision%20Detection.pdf
 
+        // I swapped the negatives and positives here because i feel like the normal for the to face should be pos y? I might be wrong though. no idea.
         let faces = vec![Vec3::X, Vec3::NEG_X,
                          Vec3::Y, Vec3::NEG_Y,
                          Vec3::Z, Vec3::NEG_Z];
