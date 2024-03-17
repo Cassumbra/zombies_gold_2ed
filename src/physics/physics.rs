@@ -5,7 +5,21 @@ use crate::{block_pos_from_global, chunk_pos_from_global, BlockID, Chunk, ChunkM
 
 const BLOCK_AABB: AabbCollider = AabbCollider{ width: 1.0, height: 1.0, length: 1.0 };
 
-pub fn do_physics(
+pub fn apply_gravity (
+    //mut commands: Commands,
+
+    mut query: Query<(&mut LinearVelocity), With<Gravity>>,
+    //mut chunk_query: Query<(&Chunk)>,
+
+    time: Res<Time>,
+    //chunk_map: Res<ChunkMap>,
+) {
+    for (mut velocity) in &mut query {
+        velocity.y -= 9.81 * time.delta_seconds();
+    }
+}
+
+pub fn do_physics (
     mut commands: Commands,
 
     mut query: Query<(Entity, &mut Transform, &mut LinearVelocity, Option<&AabbCollider>,)>,
@@ -32,8 +46,24 @@ pub fn do_physics(
                         if chunk[block_position].id != BlockID::Air {
                             let (penetration, normal) = collider.get_penetration_and_normal(transform.translation, BLOCK_AABB, global_block_position.as_vec3());
                             if normal != Vec3::ZERO {
-                                println!("Penetration: {}, Normal: {}", penetration, normal);
+                                if normal.y != 1.0  {
+                                    println!("Penetration: {}, Normal: {}", penetration, normal);
+                                }
                                 transform.translation += penetration * normal;
+                                
+                                for i in 0..=2 {
+                                    if normal[i] < 0.0 && velocity[i] > 0.0 {
+                                        velocity[i] = 0.0;
+                                    }
+                                    else if normal[i] > 0.0 && velocity[i] < 0.0 {
+                                        velocity[i] = 0.0;
+                                    }
+
+                                    if i != 1 && velocity[i] == 0.0 {
+                                        println!("velocity zeroed");
+                                    }
+                                }
+                                
                             }
                         }
                         continue;
@@ -117,6 +147,10 @@ impl AabbCollider {
         return(penetration, normal);
     }
 }
+
+#[derive(Component, Default, Copy, Clone, Reflect)]
+#[reflect(Component)]
+pub struct Gravity;
 
 #[derive(Component, Default, Copy, Clone, Reflect, Deref, DerefMut)]
 #[reflect(Component)]

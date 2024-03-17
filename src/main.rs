@@ -186,6 +186,7 @@ fn main () {
             player_input_game,
             movement::movement,
             movement::apply_movement_damping,
+            apply_gravity,
             do_physics,
         )
             .chain(),
@@ -335,6 +336,7 @@ pub fn setup(
             6.0,
         ),
         LinearVelocity::default(),
+        Gravity,
         Player,
         MoveToSpawn,
         InputManagerBundle::<Action> {
