@@ -55,8 +55,12 @@ pub fn player_input_game (
             direction -= right;
         }
 
-        if action_state.pressed(&Action::Jump) {
+        if direction != Vec3::ZERO {
+            evw_movement.send(MovementAction::new(player, MovementType::Move(Vec2::new(direction.x, direction.z)) ));
+        }
 
+        if action_state.pressed(&Action::Jump) {
+            evw_movement.send(MovementAction::new(player, MovementType::Jump));
         }
 
         
@@ -108,9 +112,7 @@ pub fn player_input_game (
         }
         
         
-        if direction != Vec3::ZERO {
-            evw_movement.send(MovementAction::new(player, MovementType::Move(Vec2::new(direction.x, direction.z)) ));
-        }
+        
         
     }   
 }

@@ -3,7 +3,7 @@
 
 use bevy::{ecs::query::Has, prelude::*, transform};
 
-use crate::{AabbCollider, LinearVelocity, Player, PLAYER_HEIGHT, PLAYER_WIDTH};
+use crate::{AabbCollider, LinearVelocity, Player, SurfaceContact, SurfaceContacts, PLAYER_HEIGHT, PLAYER_WIDTH};
 
 
 
@@ -150,26 +150,20 @@ pub fn update_grounded(
 pub fn movement(
     time: Res<Time>,
     mut movement_event_reader: EventReader<MovementAction>,
-    mut controllers: Query<(
-        &MovementAcceleration,
-        &JumpImpulse,
-        &mut LinearVelocity,
-        Has<Grounded>,
-        &Transform
-    )>,
+    mut controllers: Query<(&MovementAcceleration, &JumpImpulse, &mut LinearVelocity, &SurfaceContacts)>,
 ) {
     let delta_time = time.delta_seconds();
 
     for event in movement_event_reader.read() {
         
-        if let Ok((movement_acceleration, jump_impulse, mut linear_velocity, is_grounded, transform)) = controllers.get_mut(event.entity) {
+        if let Ok((movement_acceleration, jump_impulse, mut linear_velocity, surface_contacts)) = controllers.get_mut(event.entity) {
             match event.movement {
                 MovementType::Move(direction) => {
                     linear_velocity.x += direction.x * movement_acceleration.0 * delta_time;
                     linear_velocity.z += direction.y * movement_acceleration.0 * delta_time;
                 }
                 MovementType::Jump => {
-                    if is_grounded {
+                    if surface_contacts.contains(&SurfaceContact::PosY) {
                         linear_velocity.y = jump_impulse.0;
                     }
                 }
