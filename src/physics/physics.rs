@@ -33,10 +33,9 @@ pub fn do_physics (
         transform.translation += **velocity * time.delta_seconds();
 
         if let Some(collider) = opt_collider {
-            for (x, y, z) in iproduct!((transform.translation.x as i32 - 3)..=(transform.translation.x as i32 + 3), 
+            let collisions: Vec<BlockCollision> = iproduct!((transform.translation.x as i32 - 3)..=(transform.translation.x as i32 + 3), 
                                        (transform.translation.y as i32 - 3)..=(transform.translation.y as i32 + 3),
-                                       (transform.translation.z as i32 - 3)..=(transform.translation.z as i32 + 3))
-            {
+                                       (transform.translation.z as i32 - 3)..=(transform.translation.z as i32 + 3)).filter_map(|(x, y, z)| {
                 let global_block_position = IVec3::new(x, y, z);
                 let chunk_position = chunk_pos_from_global(global_block_position);
                 let block_position = block_pos_from_global(global_block_position);
@@ -46,9 +45,9 @@ pub fn do_physics (
                         if chunk[block_position].id != BlockID::Air {
                             let (penetration, normal) = collider.get_penetration_and_normal(transform.translation, BLOCK_AABB, global_block_position.as_vec3());
                             if normal != Vec3::ZERO {
-                                if normal.y != 1.0  {
-                                    println!("Penetration: {}, Normal: {}", penetration, normal);
-                                }
+                                //if normal.y != 1.0  {
+                                //    println!("Penetration: {}, Normal: {}", penetration, normal);
+                                //}
                                 transform.translation += penetration * normal;
                                 
                                 for i in 0..=2 {
@@ -59,22 +58,43 @@ pub fn do_physics (
                                         velocity[i] = 0.0;
                                     }
 
-                                    if i != 1 && velocity[i] == 0.0 {
-                                        println!("velocity zeroed");
-                                    }
+                                    //if i != 1 && velocity[i] == 0.0 {
+                                    //    println!("velocity zeroed");
+                                    //}
                                 }
-                                
+
+                                return Some(BlockCollision::new(IVec3::new(x, y, z), penetration, normal));
                             }
                         }
-                        continue;
+                        return None;
+                        //continue;
                     }
                 }
                 // OOB check
-                if collider.get_intersection(transform.translation, BLOCK_AABB, global_block_position.as_vec3()) {
-                    println!("OOB at {}", global_block_position);
+                let (penetration, normal) = collider.get_penetration_and_normal(transform.translation, BLOCK_AABB, global_block_position.as_vec3());
+                if normal != Vec3::ZERO {
+                    return Some(BlockCollision::new(IVec3::new(x, y, z), penetration, normal));
+                    //println!("OOB at {}", global_block_position);
                 }
-            }
+
+                return None;
+            }).collect();
+
+            println!("Collisions: {:?}", collisions);
+
         }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct BlockCollision {
+    pub position: IVec3,
+    pub penetration: f32,
+    pub normal: Vec3,
+}
+impl BlockCollision {
+    pub fn new(position: IVec3, penetration: f32, normal: Vec3) -> BlockCollision {
+        BlockCollision {position, penetration, normal}
     }
 }
 
