@@ -29,7 +29,7 @@ impl Inventory {
         }
 
         let mut item_totals: Vec<Item> = item_totals.iter().map(|(id, total)| Item{ id: *id, amount: *total }).collect();
-        item_totals.sort_by_key(|item| item.id);
+        item_totals.sort_unstable_by_key(|item| item.id);
 
         self.clear();
         

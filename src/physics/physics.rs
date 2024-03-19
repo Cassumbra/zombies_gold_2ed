@@ -33,7 +33,7 @@ pub fn do_physics (
         transform.translation += **velocity * time.delta_seconds();
 
         if let Some(collider) = opt_collider {
-            let collisions: Vec<BlockCollision> = iproduct!((transform.translation.x as i32 - 3)..=(transform.translation.x as i32 + 3), 
+            let mut collisions: Vec<BlockCollision> = iproduct!((transform.translation.x as i32 - 3)..=(transform.translation.x as i32 + 3), 
                                        (transform.translation.y as i32 - 3)..=(transform.translation.y as i32 + 3),
                                        (transform.translation.z as i32 - 3)..=(transform.translation.z as i32 + 3)).filter_map(|(x, y, z)| {
                 let global_block_position = IVec3::new(x, y, z);
@@ -45,6 +45,7 @@ pub fn do_physics (
                         if chunk[block_position].id != BlockID::Air {
                             let (penetration, normal) = collider.get_penetration_and_normal(transform.translation, BLOCK_AABB, global_block_position.as_vec3());
                             if normal != Vec3::ZERO {
+                                /*
                                 //if normal.y != 1.0  {
                                 //    println!("Penetration: {}, Normal: {}", penetration, normal);
                                 //}
@@ -62,8 +63,9 @@ pub fn do_physics (
                                     //    println!("velocity zeroed");
                                     //}
                                 }
+                                 */
 
-                                return Some(BlockCollision::new(IVec3::new(x, y, z), penetration, normal));
+                                return Some(BlockCollision::new(global_block_position, penetration, normal));
                             }
                         }
                         return None;
@@ -73,19 +75,50 @@ pub fn do_physics (
                 // OOB check
                 let (penetration, normal) = collider.get_penetration_and_normal(transform.translation, BLOCK_AABB, global_block_position.as_vec3());
                 if normal != Vec3::ZERO {
-                    return Some(BlockCollision::new(IVec3::new(x, y, z), penetration, normal));
+                    return Some(BlockCollision::new(global_block_position, penetration, normal));
                     //println!("OOB at {}", global_block_position);
                 }
 
                 return None;
             }).collect();
 
-            println!("Collisions: {:?}", collisions);
+            collisions.sort_unstable_by(|collision_a, collision_b| collision_b.penetration.partial_cmp(&collision_a.penetration).unwrap());
+
+            let mut collisions_new = Vec::<BlockCollision>::new();
+
+            for (i, collision) in collisions.iter().enumerate() {
+                let (penetration, normal) = if i != 0 {collider.get_penetration_and_normal(transform.translation, BLOCK_AABB, collision.position.as_vec3())} else {(collision.penetration, collision.normal)};
+
+                if normal != Vec3::ZERO {
+                    //if normal.y != 1.0  {
+                    //    println!("Penetration: {}, Normal: {}", penetration, normal);
+                    //}
+                    transform.translation += penetration * normal;
+                    
+                    for i in 0..=2 {
+                        if normal[i] < 0.0 && velocity[i] > 0.0 {
+                            velocity[i] = 0.0;
+                        }
+                        else if normal[i] > 0.0 && velocity[i] < 0.0 {
+                            velocity[i] = 0.0;
+                        }
+
+                        //if i != 1 && velocity[i] == 0.0 {
+                        //    println!("velocity zeroed");
+                        //}
+                    }
+
+                    collisions_new.push(BlockCollision::new(collision.position, penetration, normal));
+                }
+            }
+
+            println!("Collisions: {:?}", collisions_new);
 
         }
     }
 }
 
+// TODO: We should probably store a bool that tells us if this is an OOB collision or not.
 #[derive(Copy, Clone, Debug)]
 pub struct BlockCollision {
     pub position: IVec3,
