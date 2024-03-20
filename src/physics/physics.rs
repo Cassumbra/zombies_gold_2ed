@@ -36,8 +36,8 @@ pub fn do_physics (
             let step_count = (frame_velocity * 4.0).abs().max_element().ceil() as i32;
             
 
-            println!("vrooms: {}", frame_velocity);
-            println!("steps: {}", step_count);
+            //println!("vrooms: {}", frame_velocity);
+            //println!("steps: {}", step_count);
 
             let mut surface_contacts = SurfaceContacts(HashSet::new());
 

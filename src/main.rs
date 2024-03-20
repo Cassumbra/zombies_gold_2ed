@@ -10,6 +10,7 @@
 
 use bevy::{app::AppExit, ecs::schedule::ScheduleLabel, pbr::wireframe::WireframePlugin, prelude::*};
 use bevy_asset_loader::prelude::*;
+use fastrand::Rng;
 //use bevy_flycam::PlayerPlugin;
 use leafwing_input_manager::prelude::*;
 use moonshine_save::{save::SavePlugin, load::LoadPlugin};
@@ -111,6 +112,8 @@ const PLAYER_WIDTH: f32 = 0.4;
 
 
 fn main () {
+    let title = if Rng::new().f32() > 0.90 {"3D Miner GOLD: Stones of Wealth and Perlin"} else {"3D Miner GOLD: Stones of Wealth and Peril"};
+
     App::new()
     //.insert_resource(WgpuOptions {
     //    features: WgpuFeatures::POLYGON_MODE_LINE,
@@ -119,7 +122,7 @@ fn main () {
     .add_plugins(
         DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                title: "3D Zombies Gold".into(),
+                title: title.into(),
                 ..default()
             }),
             ..default()
