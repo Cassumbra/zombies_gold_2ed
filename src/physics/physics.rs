@@ -8,14 +8,14 @@ const BLOCK_AABB: AabbCollider = AabbCollider{ width: 1.0, height: 1.0, length: 
 pub fn apply_gravity (
     //mut commands: Commands,
 
-    mut query: Query<(&mut LinearVelocity), With<Gravity>>,
+    mut query: Query<(&mut LinearVelocity, &Gravity)>,
     //mut chunk_query: Query<(&Chunk)>,
 
     time: Res<Time>,
     //chunk_map: Res<ChunkMap>,
 ) {
-    for (mut velocity) in &mut query {
-        velocity.y -= 9.81 * time.delta_seconds();
+    for (mut velocity, gravity) in &mut query {
+        velocity.y -= gravity.0 * time.delta_seconds();
     }
 }
 
@@ -30,112 +30,106 @@ pub fn do_physics (
 
 ) {
     for (entity, mut transform, mut velocity, opt_collider) in &mut query {
-        transform.translation += **velocity * time.delta_seconds();
+        let frame_velocity = **velocity * time.delta_seconds();
 
         if let Some(collider) = opt_collider {
+            let step_count = (frame_velocity * 4.0).abs().max_element().ceil() as i32;
+            
+
+            println!("vrooms: {}", frame_velocity);
+            println!("steps: {}", step_count);
+
             let mut surface_contacts = SurfaceContacts(HashSet::new());
 
-            let mut collisions: Vec<BlockCollision> = iproduct!((transform.translation.x - collider.width.ceil()) as i32..=(transform.translation.x + collider.width.ceil()) as i32, 
+            for _ in 0..step_count {
+                let frame_velocity = **velocity * time.delta_seconds();
+                let step_velocity = frame_velocity / step_count as f32;
+                transform.translation += step_velocity;
+
+                let mut collisions: Vec<BlockCollision> = iproduct!((transform.translation.x - collider.width.ceil()) as i32..=(transform.translation.x + collider.width.ceil()) as i32, 
                                                                 (transform.translation.y - collider.height.ceil()) as i32..=(transform.translation.y + collider.height.ceil()) as i32,
                                                                 (transform.translation.z - collider.length.ceil()) as i32..=(transform.translation.z + collider.length.ceil()) as i32).filter_map(|(x, y, z)| {
-                let global_block_position = IVec3::new(x, y, z);
-                let chunk_position = chunk_pos_from_global(global_block_position);
-                let block_position = block_pos_from_global(global_block_position);
+                    let global_block_position = IVec3::new(x, y, z);
+                    let chunk_position = chunk_pos_from_global(global_block_position);
+                    let block_position = block_pos_from_global(global_block_position);
 
-                if let Some(chunk_entity) = chunk_map.get(&chunk_position) {
-                    if let Ok(chunk) = chunk_query.get(*chunk_entity) {
-                        if chunk[block_position].id != BlockID::Air {
-                            let (penetration, normal) = collider.get_penetration_and_normal(transform.translation, BLOCK_AABB, global_block_position.as_vec3());
-                            if normal != Vec3::ZERO {
-                                /*
-                                //if normal.y != 1.0  {
-                                //    println!("Penetration: {}, Normal: {}", penetration, normal);
-                                //}
-                                transform.translation += penetration * normal;
-                                
-                                for i in 0..=2 {
-                                    if normal[i] < 0.0 && velocity[i] > 0.0 {
-                                        velocity[i] = 0.0;
-                                    }
-                                    else if normal[i] > 0.0 && velocity[i] < 0.0 {
-                                        velocity[i] = 0.0;
-                                    }
-
-                                    //if i != 1 && velocity[i] == 0.0 {
-                                    //    println!("velocity zeroed");
-                                    //}
+                    if let Some(chunk_entity) = chunk_map.get(&chunk_position) {
+                        if let Ok(chunk) = chunk_query.get(*chunk_entity) {
+                            if chunk[block_position].id != BlockID::Air {
+                                let (penetration, normal) = collider.get_penetration_and_normal(transform.translation, BLOCK_AABB, global_block_position.as_vec3());
+                                if normal != Vec3::ZERO {
+                                    return Some(BlockCollision::new(global_block_position, penetration, normal));
                                 }
-                                 */
-
-                                return Some(BlockCollision::new(global_block_position, penetration, normal));
                             }
+                            return None;
                         }
-                        return None;
-                        //continue;
                     }
-                }
-                // OOB check
-                let (penetration, normal) = collider.get_penetration_and_normal(transform.translation, BLOCK_AABB, global_block_position.as_vec3());
-                if normal != Vec3::ZERO {
-                    return Some(BlockCollision::new(global_block_position, penetration, normal));
-                    //println!("OOB at {}", global_block_position);
-                }
+                    // OOB check
+                    let (penetration, normal) = collider.get_penetration_and_normal(transform.translation, BLOCK_AABB, global_block_position.as_vec3());
+                    if normal != Vec3::ZERO {
+                        return Some(BlockCollision::new(global_block_position, penetration, normal));
+                        //println!("OOB at {}", global_block_position);
+                    }
 
-                return None;
-            }).collect();
+                    return None;
+                }).collect();
 
-            collisions.sort_unstable_by(|collision_a, collision_b| collision_b.penetration.partial_cmp(&collision_a.penetration).unwrap());
+                collisions.sort_unstable_by(|collision_a, collision_b| collision_b.penetration.partial_cmp(&collision_a.penetration).unwrap());
 
-            let mut collisions_new = Vec::<BlockCollision>::new();
+                let mut collisions_new = Vec::<BlockCollision>::new();
 
-            for (i, collision) in collisions.iter().enumerate() {
-                let (penetration, normal) = if i != 0 {collider.get_penetration_and_normal(transform.translation, BLOCK_AABB, collision.position.as_vec3())} else {(collision.penetration, collision.normal)};
+                for (i, collision) in collisions.iter().enumerate() {
+                    let (penetration, normal) = if i != 0 {collider.get_penetration_and_normal(transform.translation, BLOCK_AABB, collision.position.as_vec3())} else {(collision.penetration, collision.normal)};
 
-                if normal != Vec3::ZERO {
-                    //if normal.y != 1.0  {
-                    //    println!("Penetration: {}, Normal: {}", penetration, normal);
-                    //}
-                    transform.translation += penetration * normal;
-                    
-                    for i in 0..=2 {
-                        let mut surface_contact: SurfaceContact;
-
-                        if normal[i] < 0.0 && velocity[i] > 0.0 {
-                            velocity[i] = 0.0;
-
-                            match i {
-                                0 => surface_contact = SurfaceContact::NegX,
-                                1 => surface_contact = SurfaceContact::NegY,
-                                2 => surface_contact = SurfaceContact::NegZ,
-                                _ => panic!(),
-                            }
-                        }
-                        else if normal[i] > 0.0 && velocity[i] < 0.0 {
-                            velocity[i] = 0.0;
-
-                            match i {
-                                0 => surface_contact = SurfaceContact::PosX,
-                                1 => surface_contact = SurfaceContact::PosY,
-                                2 => surface_contact = SurfaceContact::PosZ,
-                                _ => panic!(),
-                            }
-                            
-                            surface_contacts.insert(surface_contact);
-                        }
-
-                        //if i != 1 && velocity[i] == 0.0 {
-                        //    println!("velocity zeroed");
+                    if normal != Vec3::ZERO {
+                        //if normal.y != 1.0  {
+                        //    println!("Penetration: {}, Normal: {}", penetration, normal);
                         //}
-                    }
+                        transform.translation += penetration * normal;
+                        
+                        for i in 0..=2 {
+                            let mut surface_contact = SurfaceContact::NegX;
 
-                    collisions_new.push(BlockCollision::new(collision.position, penetration, normal));
+                            if normal[i] < 0.0 && velocity[i] > 0.0 {
+                                velocity[i] = 0.0;
+
+                                match i {
+                                    0 => surface_contact = SurfaceContact::NegX,
+                                    1 => surface_contact = SurfaceContact::NegY,
+                                    2 => surface_contact = SurfaceContact::NegZ,
+                                    _ => panic!(),
+                                }
+                            }
+                            else if normal[i] > 0.0 && velocity[i] < 0.0 {
+                                velocity[i] = 0.0;
+
+                                match i {
+                                    0 => surface_contact = SurfaceContact::PosX,
+                                    1 => surface_contact = SurfaceContact::PosY,
+                                    2 => surface_contact = SurfaceContact::PosZ,
+                                    _ => panic!(),
+                                }
+                            }
+
+                            surface_contacts.insert(surface_contact);
+
+                            //if i != 1 && velocity[i] == 0.0 {
+                            //    println!("velocity zeroed");
+                            //}
+                        }
+
+                        collisions_new.push(BlockCollision::new(collision.position, penetration, normal));
+                    }
                 }
             }
 
             commands.get_entity(entity).unwrap().insert(surface_contacts);
             //commands.get_entity(entity).unwrap().insert(BlockCollisions(collisions_new));
-            println!("Collisions: {:?}", collisions_new);
+            //println!("Collisions: {:?}", collisions_new);
 
+        }
+        else {
+            transform.translation += frame_velocity;
         }
     }
 }
@@ -227,9 +221,9 @@ impl AabbCollider {
     }
 }
 
-#[derive(Component, Default, Copy, Clone, Reflect)]
+#[derive(Component, Default, Copy, Clone, Reflect, Deref, DerefMut)]
 #[reflect(Component)]
-pub struct Gravity;
+pub struct Gravity(pub f32);
 
 #[derive(Component, Default, Copy, Clone, Reflect, Deref, DerefMut)]
 #[reflect(Component)]
