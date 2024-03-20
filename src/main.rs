@@ -331,12 +331,12 @@ pub fn setup(
          */
         SpatialBundle::default(),
         movement::CharacterControllerBundle::new(AabbCollider::new(PLAYER_WIDTH, PLAYER_HEIGHT, PLAYER_WIDTH)).with_movement(
-            500.0,
+            9.0,
             0.92,
-            1200.0,
+            6.0,
         ),
         LinearVelocity::default(),
-        Gravity(600.0),
+        Gravity(14.0),
         Player,
         MoveToSpawn,
         InputManagerBundle::<Action> {

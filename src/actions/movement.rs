@@ -163,9 +163,9 @@ pub fn movement(
                     linear_velocity.z += direction.y * movement_acceleration.0 * delta_time;
                 }
                 MovementType::Jump => {
-                    //if surface_contacts.contains(&SurfaceContact::PosY) {
+                    if surface_contacts.contains(&SurfaceContact::PosY) {
                         linear_velocity.y = jump_impulse.0;
-                    //}
+                    }
                 }
             }
         }
