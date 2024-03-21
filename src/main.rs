@@ -106,7 +106,7 @@ const WORLD_HEIGHT: i32 = 4;
 /// Underground depth.
 const WORLD_DEPTH: i32 = 12;
 
-const PLAYER_HEIGHT: f32 = 1.4;
+const PLAYER_HEIGHT: f32 = 1.8;
 const PLAYER_WIDTH: f32 = 0.4;
 
 
