@@ -136,16 +136,20 @@ pub fn do_physics (
 
 // https://gamedev.stackexchange.com/a/49423
 // Imagine writing an answer in JAVASCRIPT
-pub fn raycast_blocks (origin: Vec3, direction: Vec3, mut range: f32) -> Vec<RayCastHit> {
+// Credit to inspi for letting me look at their code to help make this more sane and also actually work
+pub fn raycast_blocks (mut origin: Vec3, direction: Vec3, mut range: f32) -> Vec<RayCastHit> {
     if direction == Vec3::ZERO {
         panic!("Raycast in zero direction!");
     }
 
+    origin = origin + 0.5;
+
     println!("origin: {}, direction: {}", origin, direction);
 
     let step = direction.signum();
-    let mut t_max = Vec3::new(intbound(origin.x, direction.x), intbound(origin.y, direction.y), intbound(origin.z, direction.z));
-    let t_delta = step / direction;
+    let next = origin.floor() + step.max(Vec3::ZERO);
+    let mut t_max = (next - origin) / direction;
+    let t_delta = 1.0 / direction.abs();
 
     let mut hits = Vec::<RayCastHit>::new();
     let mut hit = RayCastHit::new(origin.floor(), Vec3::ZERO);
@@ -198,26 +202,6 @@ pub fn raycast_blocks (origin: Vec3, direction: Vec3, mut range: f32) -> Vec<Ray
     }
 
     return hits;
-}
-
-// What do any of these variables *actually* mean??? why is this typed like this????
-pub fn intbound(mut s: f32, ds: f32) -> f32 {
-    if ds < 0.0 && s.round() == s {
-        return 0.0;
-    }
-
-    return if ds > 0.0 {s.ceil() - s} else {s - s.floor() / ds.abs()};
-
-    /*
-    // Find the smallest positive t such that s+t*ds is an integer.
-    if ds < 0.0 {
-      return intbound(-s, -ds);
-    } else {
-      s = s.rem_euclid(1.0);
-      // problem is now s+t*ds = 1
-      return (1.0 - s) / ds;
-    }
-     */
 }
 
 #[derive(Copy, Clone, Debug, Reflect)]
