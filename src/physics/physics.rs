@@ -144,7 +144,7 @@ pub fn raycast_blocks (mut origin: Vec3, direction: Vec3, mut range: f32) -> Vec
 
     origin = origin + 0.5;
 
-    println!("origin: {}, direction: {}", origin, direction);
+    //println!("origin: {}, direction: {}", origin, direction);
 
     let step = direction.signum();
     let next = origin.floor() + step.max(Vec3::ZERO);
@@ -159,7 +159,7 @@ pub fn raycast_blocks (mut origin: Vec3, direction: Vec3, mut range: f32) -> Vec
     range /= direction.length();
 
     for _ in 0..500 {
-        println!("t_max: {}", t_max);
+        //println!("t_max: {}", t_max);
 
         hits.push(hit);
 
