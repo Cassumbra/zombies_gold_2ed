@@ -176,8 +176,8 @@ fn main () {
 
     .add_systems(Update, rendering::update_chunk_meshes.run_if(in_state(GameState::Playing)))
     .add_systems(Update, move_to_spawn.run_if(in_state(GameState::Playing)))
-    //.add_systems(Update, mining)
-    //.add_systems(Update, damage_block)
+    .add_systems(Update, mining)
+    .add_systems(Update, damage_block)
     //.add_systems(Update, building)
     //.add_systems(Update, place_block)
     

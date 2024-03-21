@@ -134,6 +134,103 @@ pub fn do_physics (
     }
 }
 
+// https://gamedev.stackexchange.com/a/49423
+// Imagine writing an answer in JAVASCRIPT
+pub fn raycast_blocks (origin: Vec3, direction: Vec3, mut range: f32) -> Vec<RayCastHit> {
+    if direction == Vec3::ZERO {
+        panic!("Raycast in zero direction!");
+    }
+
+    println!("origin: {}, direction: {}", origin, direction);
+
+    let step = direction.signum();
+    let mut t_max = Vec3::new(intbound(origin.x, direction.x), intbound(origin.y, direction.y), intbound(origin.z, direction.z));
+    let t_delta = step / direction;
+
+    let mut hits = Vec::<RayCastHit>::new();
+    let mut hit = RayCastHit::new(origin.floor(), Vec3::ZERO);
+
+    // Rescale from units of 1 cube-edge to units of 'direction' so we can
+    // compare with 't'.
+    range /= direction.length();
+
+    for _ in 0..500 {
+        println!("t_max: {}", t_max);
+
+        hits.push(hit);
+
+        if t_max.x < t_max.y {
+            if t_max.x < t_max.z {
+                if t_max.x > range {break};
+
+                hit.position.x += step.x;
+                t_max.x += t_delta.x;
+
+                hit.normal = Vec3::new(-step.x, 0.0, 0.0);
+            }
+            else {
+                if t_max.z > range {break};
+
+                hit.position.z += step.z;
+                t_max.z += t_delta.z;
+
+                hit.normal = Vec3::new(0.0, 0.0, -step.z);
+            }
+        }
+        else {
+            if t_max.y < t_max.z {
+                if t_max.y > range {break};
+
+                hit.position.y += step.y;
+                t_max.y += t_delta.y;
+
+                hit.normal = Vec3::new(0.0, -step.y, 0.0);
+            }
+            else {
+                if t_max.z > range {break};
+
+                hit.position.z += step.z;
+                t_max.z += t_delta.z;
+
+                hit.normal = Vec3::new(0.0, 0.0, -step.z);
+            }
+        }
+    }
+
+    return hits;
+}
+
+// What do any of these variables *actually* mean??? why is this typed like this????
+pub fn intbound(mut s: f32, ds: f32) -> f32 {
+    if ds < 0.0 && s.round() == s {
+        return 0.0;
+    }
+
+    return if ds > 0.0 {s.ceil() - s} else {s - s.floor() / ds.abs()};
+
+    /*
+    // Find the smallest positive t such that s+t*ds is an integer.
+    if ds < 0.0 {
+      return intbound(-s, -ds);
+    } else {
+      s = s.rem_euclid(1.0);
+      // problem is now s+t*ds = 1
+      return (1.0 - s) / ds;
+    }
+     */
+}
+
+#[derive(Copy, Clone, Debug, Reflect)]
+pub struct RayCastHit {
+    pub position: Vec3,
+    pub normal: Vec3,
+}
+impl RayCastHit {
+    pub fn new(position: Vec3, normal: Vec3) -> RayCastHit {
+        RayCastHit {position, normal}
+    }
+}
+
 // TODO: We should probably store a bool that tells us if this is an OOB collision or not.
 #[derive(Copy, Clone, Debug, Reflect)]
 pub struct BlockCollision {

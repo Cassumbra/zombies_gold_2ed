@@ -4,7 +4,7 @@ use bevy::prelude::*;
 
 use movement::*;
 
-use crate::{block_pos_from_global, chunk_pos_from_global, Block, BlockID, Chunk, ChunkMap, Inventory, CHUNK_SIZE};
+use crate::{block_pos_from_global, chunk_pos_from_global, raycast_blocks, Block, BlockID, Chunk, ChunkMap, Inventory, CHUNK_SIZE};
 pub mod movement;
 
 
@@ -72,14 +72,12 @@ impl Default for BuildingTimer {
     }
 }
 
-/*
 pub fn mining (
     //mut commands: Commands,
 
     mut miner_query: Query<(Entity, &mut MiningTimer, &Children)>,
     // TODO: We should use some "head" component or something later on when we have entities that mine but don't have a camera.
     cam_query: Query<(&GlobalTransform), With<Camera>>,
-    spatial_query: SpatialQuery,
     
     mut evr_mining: EventReader<MiningEvent>,
     mut evw_damage_block: EventWriter<DamageBlockEvent>,
@@ -93,23 +91,11 @@ pub fn mining (
 
             for child in children.iter() {
                 if let Ok(global_transform) = cam_query.get(*child) {
-                    for hit in spatial_query.ray_hits(
-                        global_transform.translation(),
-                        // TODO: I don't think we have to normalize this, actually? IDK.
-                        Direction3d::new_unchecked(global_transform.forward().normalize()),
-                        5.0,                         
-                        1,                             
-                        true,                          
-                        SpatialQueryFilter::default().with_excluded_entities(vec![entity]), 
-                    ) {
-                        let hit_point = global_transform.translation() + global_transform.forward() * hit.time_of_impact;
-                        //println!("forward: {}", global_transform.forward());
-                        //println!("normalized forward: {}", global_transform.forward().normalize());
-                        let hit_coords = (hit_point - hit.normal / 2.0).round().as_ivec3();
-                        println!("hit: {:?}, hit_point: {:?}", hit, hit_point);
-                        println!("hit_coords: {:?}", hit_coords);
+                    let hits = raycast_blocks(global_transform.translation(), global_transform.forward().normalize(), 3.0);
+                    for hit in hits {
+                        println!("hit_position: {}, hit_normal: {}", hit.position, hit.normal);
 
-                        evw_damage_block.send(DamageBlockEvent { position: hit_coords, damage: 1, strength: 1, entity });
+                        evw_damage_block.send(DamageBlockEvent { position: hit.position.as_ivec3(), damage: 1, strength: 1, entity });
                     }
                 }
             }
@@ -175,12 +161,12 @@ pub fn damage_block (
     }
 }
 
+/*
 pub fn building (
     // TODO: Add some component to tell us what to actually build.
     mut builder_query: Query<(Entity, &mut BuildingTimer, &Children)>,
     // TODO: We should use some "head" component or something later on when we have entities that build but don't have a camera.
     cam_query: Query<(&GlobalTransform), With<Camera>>,
-    spatial_query: SpatialQuery,
     
     mut evr_building: EventReader<BuildingEvent>,
     mut evw_put_block: EventWriter<PutBlockEvent>,
