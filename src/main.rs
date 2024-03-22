@@ -8,7 +8,7 @@
 
 #![feature(const_fn_floating_point_arithmetic)]
 
-use bevy::{app::AppExit, ecs::schedule::ScheduleLabel, pbr::wireframe::WireframePlugin, prelude::*};
+use bevy::{app::AppExit, ecs::schedule::ScheduleLabel, pbr::wireframe::WireframePlugin, prelude::*, render::texture::{ImageFilterMode, ImageSampler, ImageSamplerDescriptor}};
 use bevy_asset_loader::prelude::*;
 use fastrand::Rng;
 //use bevy_flycam::PlayerPlugin;
@@ -113,6 +113,8 @@ const PLAYER_WIDTH: f32 = 0.4;
 
 fn main () {
     let title = if Rng::new().f32() > 0.90 {"3D Miner GOLD: Stones of Wealth and Perlin"} else {"3D Miner GOLD: Stones of Wealth and Peril"};
+    let mut default_sampler =  ImageSamplerDescriptor::nearest();
+    //default_sampler.mipmap_filter = ImageFilterMode::Linear;
 
     App::new()
     //.insert_resource(WgpuOptions {
@@ -127,13 +129,10 @@ fn main () {
             }),
             ..default()
         })
-        .set(ImagePlugin::default_nearest())
+        .set(ImagePlugin { default_sampler })
     )
     .add_plugins(WireframePlugin)
-    //.insert_resource(NarrowPhaseConfig {
-    //    prediction_distance: 0.0,
-    //})
-    //.insert_resource(Msaa::Sample4)
+    .insert_resource(Msaa::Off)
 
     .init_state::<GameState>()
         .add_loading_state(

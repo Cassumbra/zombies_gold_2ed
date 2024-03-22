@@ -163,6 +163,7 @@ pub fn update_chunk_meshes (
         material.alpha_mode = AlphaMode::Mask(0.0);
         material.base_color_texture = Some(atlas.res_8x8.clone());
 
+
         // Some quads were generated.
         //assert!(buffer.num_quads() > 0);
         //println!("quads: {}", buffer.num_quads());
