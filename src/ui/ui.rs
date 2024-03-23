@@ -1,4 +1,6 @@
-use bevy::prelude::*;
+use bevy::{a11y::AccessibilityNode, prelude::*};
+
+use crate::{Inventory, ItemID, Player};
 
 pub fn setup_ui (
     mut commands: Commands,
@@ -30,4 +32,77 @@ pub fn setup_ui (
             ..default()
         }),
     ));
+
+    commands.spawn(NodeBundle {
+        style: Style {
+            flex_direction: FlexDirection::Column,
+            //justify_content: JustifyContent::Start,
+            //align_items: AlignItems::Start,
+
+            ..default()
+        },
+
+        ..default()
+    })
+    .insert(ItemDisplayRoot);
 }
+
+pub fn update_resource_counts (
+    mut commands: Commands,
+
+    inventory_query: Query<(&Inventory), (With<Player>, Changed<Inventory>)>,
+    root_query: Query<(Entity), With<ItemDisplayRoot>>,
+    item_display_query: Query<(Entity), With<ItemDisplay>>,
+) {
+    if let Ok(inventory) = inventory_query.get_single() {
+        if let Ok(root) = root_query.get_single() {
+            for (entity) in &item_display_query {
+                commands.entity(entity).despawn_recursive();
+            }
+
+            let mut opt_last_item_id: Option<ItemID> = None;
+    
+            for item in inventory.iter() {
+                if Some(item.id) == opt_last_item_id {
+                    continue;
+                }
+    
+                
+                let number_entity = commands.spawn(TextBundle::from_section(inventory.get_item_amount(item.id).to_string(), TextStyle { font_size: 100.0, color: Color::WHITE, ..default()}))
+                    .insert(Style::default())
+                    .id();
+
+                let image_entity = commands.spawn(TextBundle::from_section(item.id.to_string(), TextStyle { font_size: 100.0, color: Color::WHITE, ..default()}))
+                    .insert(Style::default())
+                    .id();
+                
+
+                let display_entity = commands.spawn(NodeBundle {
+                    style: Style {
+                        flex_direction: FlexDirection::Row,
+
+                        ..default()
+                    },
+
+                    ..default()
+                })
+                .insert(ItemDisplay(item.id))
+                .add_child(number_entity)
+                .add_child(image_entity)
+                .id();
+    
+                commands.entity(root).add_child(display_entity);
+    
+                opt_last_item_id = Some(item.id);
+            }
+        }
+    }
+}
+
+#[derive(Component, Clone, Debug, Reflect)]
+#[reflect(Component)]
+pub struct ItemDisplayRoot;
+
+#[derive(Component, Clone, Debug, Reflect, Deref, DerefMut)]
+#[reflect(Component)]
+pub struct ItemDisplay(ItemID);

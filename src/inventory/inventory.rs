@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, fmt::Display};
 
 use bevy::{prelude::*, utils::hashbrown::HashMap};
 use itertools::Itertools;
@@ -149,7 +149,6 @@ impl Item {
 }
 
 
-//TODO: Optimization: If we want to get *really* silly with optimization, we can combine everything here into a single unsigned, and start splitting bytes into nibbles
 #[derive(Default, Clone, Copy)]
 pub struct ItemAttributes {
     pub tex_coords: IVec2,
@@ -160,7 +159,7 @@ pub struct ItemAttributes {
     pub max_amount: u16,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, Debug)]
 pub enum ItemID {
     //BuildingMaterial(BuildingMaterial),
     Stone,
@@ -170,7 +169,15 @@ impl ItemID {
     fn get_attributes(self) -> ItemAttributes {
         match self {
             ItemID::Stone => ItemAttributes { tex_coords: IVec2::new(0, 0), coord_increment_num: MAX_MATERIAL / 4, max_amount: MAX_MATERIAL}, //coord_increment_limit: MAX_MATERIAL },
-            ItemID::Wood => todo!(),
+            ItemID::Wood => ItemAttributes { tex_coords: IVec2::new(0, 1), coord_increment_num: MAX_MATERIAL / 4, max_amount: MAX_MATERIAL},
+        }
+    }
+}
+impl Display for ItemID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ItemID::Stone => write!(f, "Stone"),
+            ItemID::Wood => write!(f, "Wood"),
         }
     }
 }

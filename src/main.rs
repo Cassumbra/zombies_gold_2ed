@@ -193,6 +193,8 @@ fn main () {
         )
             .chain(),
     )
+
+    .add_systems(Update, update_resource_counts)
      
 
     /*
@@ -260,8 +262,8 @@ pub fn move_to_spawn (
 struct Atlas{
     #[asset(path = "textures_8x8.png")]
     pub res_8x8: Handle<Image>,
-
 }
+
 
 #[derive(Clone, Copy, Resource, Deref, DerefMut, Reflect)]
 pub struct RNGSeed(u32);
