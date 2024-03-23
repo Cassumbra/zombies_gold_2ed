@@ -6,33 +6,19 @@ pub fn setup_ui (
     mut commands: Commands,
     //asset_server: Res<AssetServer>,
 ) {
-    commands.spawn(NodeBundle {
+    commands
+    .spawn(NodeBundle {
         style: Style {
-            flex_direction: FlexDirection::Column,
-            position_type: PositionType::Absolute,
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
             align_items: AlignItems::Center,
-            justify_items: JustifyItems::Center,
-            align_self: AlignSelf::Center,
-            justify_self: JustifySelf::Center,
-            align_content: AlignContent::Center,
             justify_content: JustifyContent::Center,
-
             ..default()
         },
-
-    ..default()
-    }).with_children(|parent| {
-        parent.spawn(NodeBundle {
-            style: Style {
-                width: Val::Px(50.0),
-                height: Val::Px(10.0),
-                ..default()
-            },
-            //background_color: BackgroundColor(Color::WHITE),
-            ..default()
-        });
-
-        parent.spawn((
+        ..default()
+    })
+    .with_children(|parent| {
+        parent.spawn(
             // Create a TextBundle that has a Text with a single section.
             TextBundle::from_section(
                 // Accepts a `String` or any type that converts into a `String`, such as `&str`
@@ -46,24 +32,26 @@ pub fn setup_ui (
                 },
             ) // Set the justification of the Text
             .with_text_justify(JustifyText::Center)
-            // Set the style of the TextBundle itself.
             .with_style(Style {
+                width: Val::Px(100.0),
+                height: Val::Px(100.0),
                 ..default()
-            }),
-        ));
-
-        parent.spawn(NodeBundle {
-            style: Style {
-                width: Val::Px(50.0),
-                height: Val::Px(10.0),
-                ..default()
-            },
-            background_color: BackgroundColor(Color::WHITE),
-            ..default()
-        });
-
+            })
+        )
+            .with_children(|parent| {
+                parent.spawn(NodeBundle {
+                    style: Style {
+                        position_type: PositionType::Absolute,
+                        top: Val::Percent(100.0),
+                        width: Val::Px(50.0),
+                        height: Val::Px(10.0),
+                        ..default()
+                    },
+                    background_color: BackgroundColor(Color::WHITE),
+                    ..default()
+                });
+            });
     });
-
     
 
     commands.spawn(NodeBundle {
