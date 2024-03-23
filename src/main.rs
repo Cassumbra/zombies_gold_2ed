@@ -195,6 +195,7 @@ fn main () {
     )
 
     .add_systems(Update, update_resource_counts.run_if(in_state(GameState::Playing)))
+    .add_systems(Update, update_progress_bar)
      
 
     /*

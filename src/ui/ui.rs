@@ -1,6 +1,6 @@
 use bevy::{a11y::AccessibilityNode, prelude::*};
 
-use crate::{Atlas, Inventory, ItemID, Player};
+use crate::{Atlas, BuildingEvent, BuildingTimer, Inventory, ItemID, MiningEvent, MiningTimer, Player};
 
 pub fn setup_ui (
     mut commands: Commands,
@@ -58,10 +58,21 @@ pub fn setup_ui (
                 height: Val::Px(10.0),
                 ..default()
             },
-            background_color: BackgroundColor(Color::WHITE),
+            background_color: BackgroundColor(Color::Rgba { red: 0.9, green: 0.9, blue: 0.9, alpha: 0.25 },),
             ..default()
+        })
+        .with_children(|parent| {
+            parent.spawn(NodeBundle {
+                style: Style {
+                    width: Val::Percent(0.0),
+                    height: Val::Percent(100.0),
+                    ..default()
+                },
+                background_color: BackgroundColor(Color::Rgba { red: 1.0, green: 1.0, blue: 1.0, alpha: 0.50 },),
+                ..default()
+            })
+            .insert(ProgressBar::None);
         });
-
     });
 
     
@@ -145,6 +156,47 @@ pub fn update_resource_counts (
             }
         }
     }
+}
+
+pub fn update_progress_bar (
+
+    mut bar_query: Query<(&mut Style, &mut ProgressBar)>,
+    timers_query: Query<(&BuildingTimer, &MiningTimer)>,
+
+    evr_building: EventReader<BuildingEvent>,
+    evr_mining: EventReader<MiningEvent>,
+) {
+    if let Ok((mut style, mut progress_bar)) = bar_query.get_single_mut() {
+        if let Ok((building_timer, mining_timer)) = timers_query.get_single() {
+            if !evr_building.is_empty() {
+                *progress_bar = ProgressBar::Building;
+            }
+    
+            if !evr_mining.is_empty() {
+                *progress_bar = ProgressBar::Mining;
+            }
+    
+            match *progress_bar {
+                ProgressBar::None => {},
+                ProgressBar::Building =>  {
+                    style.width = Val::Percent(building_timer.fraction() * 100.0);
+                },
+                ProgressBar::Mining => {
+                    style.width = Val::Percent(mining_timer.fraction() * 100.0);
+                },
+                
+            }
+        }
+        
+    }
+}
+
+#[derive(Component, Clone, Debug, Reflect)]
+#[reflect(Component)]
+pub enum ProgressBar {
+    None,
+    Building,
+    Mining,
 }
 
 #[derive(Component, Clone, Debug, Reflect)]
