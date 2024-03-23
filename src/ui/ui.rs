@@ -158,6 +158,8 @@ pub fn update_resource_counts (
     }
 }
 
+const PROGRESS_BAR_SMOOTHNESS: f32 = 12.0;
+
 pub fn update_progress_bar (
 
     mut bar_query: Query<(&mut Style, &mut ProgressBar)>,
@@ -176,16 +178,22 @@ pub fn update_progress_bar (
                 *progress_bar = ProgressBar::Mining;
             }
     
+            let mut timer_fraction = 0.0;
+
             match *progress_bar {
                 ProgressBar::None => {},
                 ProgressBar::Building =>  {
-                    style.width = Val::Percent(building_timer.fraction() * 100.0);
+                    timer_fraction = building_timer.fraction()
                 },
                 ProgressBar::Mining => {
-                    style.width = Val::Percent(mining_timer.fraction() * 100.0);
+                    timer_fraction = mining_timer.fraction()
                 },
                 
             }
+
+
+            style.width = Val::Percent(((timer_fraction * PROGRESS_BAR_SMOOTHNESS).round() / PROGRESS_BAR_SMOOTHNESS) * 100.0);
+            //style.width = Val::Percent(timer_fraction * 100.0);
         }
         
     }
