@@ -6,22 +6,9 @@ pub fn setup_ui (
     mut commands: Commands,
     //asset_server: Res<AssetServer>,
 ) {
-    commands.spawn((
-        // Create a TextBundle that has a Text with a single section.
-        TextBundle::from_section(
-            // Accepts a `String` or any type that converts into a `String`, such as `&str`
-            "+",
-            TextStyle {
-                // This font is loaded and will be used instead of the default font.
-                //font: asset_server.load("fonts/FiraSans-Bold.ttf"),
-                font_size: 100.0,
-                color: Color::Rgba { red: 1.0, green: 1.0, blue: 1.0, alpha: 0.25 },
-                ..default()
-            },
-        ) // Set the justification of the Text
-        .with_text_justify(JustifyText::Center)
-        // Set the style of the TextBundle itself.
-        .with_style(Style {
+    commands.spawn(NodeBundle {
+        style: Style {
+            flex_direction: FlexDirection::Column,
             position_type: PositionType::Absolute,
             align_items: AlignItems::Center,
             justify_items: JustifyItems::Center,
@@ -29,9 +16,55 @@ pub fn setup_ui (
             justify_self: JustifySelf::Center,
             align_content: AlignContent::Center,
             justify_content: JustifyContent::Center,
+
             ..default()
-        }),
-    ));
+        },
+
+    ..default()
+    }).with_children(|parent| {
+        parent.spawn(NodeBundle {
+            style: Style {
+                width: Val::Px(50.0),
+                height: Val::Px(10.0),
+                ..default()
+            },
+            //background_color: BackgroundColor(Color::WHITE),
+            ..default()
+        });
+
+        parent.spawn((
+            // Create a TextBundle that has a Text with a single section.
+            TextBundle::from_section(
+                // Accepts a `String` or any type that converts into a `String`, such as `&str`
+                "+",
+                TextStyle {
+                    // This font is loaded and will be used instead of the default font.
+                    //font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                    font_size: 100.0,
+                    color: Color::Rgba { red: 1.0, green: 1.0, blue: 1.0, alpha: 0.25 },
+                    ..default()
+                },
+            ) // Set the justification of the Text
+            .with_text_justify(JustifyText::Center)
+            // Set the style of the TextBundle itself.
+            .with_style(Style {
+                ..default()
+            }),
+        ));
+
+        parent.spawn(NodeBundle {
+            style: Style {
+                width: Val::Px(50.0),
+                height: Val::Px(10.0),
+                ..default()
+            },
+            background_color: BackgroundColor(Color::WHITE),
+            ..default()
+        });
+
+    });
+
+    
 
     commands.spawn(NodeBundle {
         style: Style {
