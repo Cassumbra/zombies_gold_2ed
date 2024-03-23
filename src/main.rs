@@ -194,7 +194,7 @@ fn main () {
             .chain(),
     )
 
-    .add_systems(Update, update_resource_counts)
+    .add_systems(Update, update_resource_counts.run_if(in_state(GameState::Playing)))
      
 
     /*
@@ -262,6 +262,11 @@ pub fn move_to_spawn (
 struct Atlas{
     #[asset(path = "textures_8x8.png")]
     pub res_8x8: Handle<Image>,
+
+    #[asset(texture_atlas_layout(tile_size_x = 8., tile_size_y = 8., columns = 32, rows = 32, padding_x = 0., padding_y = 0., offset_x = 0., offset_y = 0.))]
+    pub items_8x8_layout: Handle<TextureAtlasLayout>,
+    #[asset(path = "items_8x8.png")]
+    pub items_8x8: Handle<Image>,
 }
 
 

@@ -141,10 +141,10 @@ impl Item {
         self.id.get_attributes()
     }
 
-    fn get_tex_coords(self) -> IVec2 {
+    pub fn get_tex_coords(self) -> IVec2 {
         let attributes = self.id.get_attributes();
         let coords = attributes.tex_coords;
-        IVec2::new(coords.x + (attributes.coord_increment_num / self.amount) as i32, coords.y)
+        IVec2::new(coords.x + (self.amount.min(attributes.max_amount) / attributes.coord_increment_num) as i32, coords.y)
     }
 }
 

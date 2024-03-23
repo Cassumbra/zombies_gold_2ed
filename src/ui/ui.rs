@@ -1,6 +1,6 @@
 use bevy::{a11y::AccessibilityNode, prelude::*};
 
-use crate::{Inventory, ItemID, Player};
+use crate::{Atlas, Inventory, ItemID, Player};
 
 pub fn setup_ui (
     mut commands: Commands,
@@ -53,6 +53,8 @@ pub fn update_resource_counts (
     inventory_query: Query<(&Inventory), (With<Player>, Changed<Inventory>)>,
     root_query: Query<(Entity), With<ItemDisplayRoot>>,
     item_display_query: Query<(Entity), With<ItemDisplay>>,
+
+    atlas: Res<Atlas>,
 ) {
     if let Ok(inventory) = inventory_query.get_single() {
         if let Ok(root) = root_query.get_single() {
@@ -69,11 +71,24 @@ pub fn update_resource_counts (
     
                 
                 let number_entity = commands.spawn(TextBundle::from_section(inventory.get_item_amount(item.id).to_string(), TextStyle { font_size: 100.0, color: Color::WHITE, ..default()}))
-                    .insert(Style::default())
                     .id();
 
-                let image_entity = commands.spawn(TextBundle::from_section(item.id.to_string(), TextStyle { font_size: 100.0, color: Color::WHITE, ..default()}))
-                    .insert(Style::default())
+                let tex_coords = item.get_tex_coords();
+                let index = tex_coords.x + tex_coords.y * 32;
+
+                println!("coords: {}, index: {}", tex_coords, index);
+
+                let image_entity = commands.spawn(ImageBundle {
+                    //style: Style {
+                    //    width: Val::Px(256.),
+                    //    height: Val::Px(256.),
+                    //    ..default()
+                    //},
+                    image: UiImage::new(atlas.items_8x8.clone()),
+                    ..default()
+                    },
+                    )
+                    .insert(TextureAtlas{ layout: atlas.items_8x8_layout.clone(), index: index as usize})
                     .id();
                 
 
