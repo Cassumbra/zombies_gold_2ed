@@ -169,8 +169,9 @@ fn main () {
 
     .add_systems(Update, map::update_chunk_positions)
     .add_systems(Update, map::update_chunk_loaders)
+    .add_systems(Update, map::generate_trees.before(generate_chunks))
     .add_systems(Update, map::generate_chunks)
-    .add_systems(Update, map::read_modification_events)
+    //.add_systems(Update, map::read_modification_events)
     .add_systems(Update, map::unload_chunks)
 
     .add_systems(Update, rendering::update_chunk_meshes.run_if(in_state(GameState::Playing)))

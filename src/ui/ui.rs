@@ -120,7 +120,7 @@ pub fn update_resource_counts (
                 let tex_coords = item.get_tex_coords();
                 let index = tex_coords.x + tex_coords.y * 32;
 
-                println!("coords: {}, index: {}", tex_coords, index);
+                //println!("coords: {}, index: {}", tex_coords, index);
 
                 let image_entity = commands.spawn(ImageBundle {
                     //style: Style {
@@ -190,7 +190,6 @@ pub fn update_progress_bar (
                 },
                 
             }
-
 
             style.width = Val::Percent(((timer_fraction * PROGRESS_BAR_SMOOTHNESS).round() / PROGRESS_BAR_SMOOTHNESS) * 100.0);
             //style.width = Val::Percent(timer_fraction * 100.0);

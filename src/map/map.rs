@@ -26,7 +26,8 @@ impl Plugin for MapPlugin {
             .init_resource::<PendingModificationMap>()
             .init_resource::<ChunkLoadingQueue>()
             .add_event::<LoadChunkEvent>()
-            .add_event::<PendingModificationEvent>();
+            .add_event::<PendingModificationEvent>()
+            .add_event::<GenerateTreeEvent>();
     }
 }
  
@@ -40,7 +41,7 @@ pub fn generate_chunks (
     mut pending_map: ResMut<PendingModificationMap>,
 
     mut evr_load_chunk: EventReader<LoadChunkEvent>,
-    mut evw_modify: EventWriter<PendingModificationEvent>,
+    mut evw_gen_tree: EventWriter<GenerateTreeEvent>,
 
     mut loader_query: Query<(&mut ChunkLoader)>,
 
@@ -82,8 +83,6 @@ pub fn generate_chunks (
             chunks_to_load.push(ev);
         }
     }
-    
-    let mut modified_chunks = Vec::new();
 
     for ev in chunks_to_load.iter() {
         //println!("loading: {:?}", ev.chunk);
@@ -107,100 +106,15 @@ pub fn generate_chunks (
 
                     // Tree!
                     if Rng::with_seed((**seed as u64).wrapping_mul(point_x.abs() as u64).wrapping_mul(point_y.abs() as u64).wrapping_mul(point_z.abs() as u64)).f32() <= 0.01 {
-                        let mut visited_positions = Vec::<IVec3>::new();
-                        let mut expansion_points = vec![IVec3::new(point_x as i32, point_y as i32 + 1, point_z as i32)];
-                        let mut up_chance = 1.0;
-                        let mut terminate_chance = 0.0;
-                        let mut branch_chance = 0.0;
-                        let mut branch_factor = 0.0;
-
-                        while !expansion_points.is_empty() {
-                            let point = expansion_points[expansion_points.len() - 1];
-
-                            visited_positions.push(point);
-                            let visited_chunk_pos = chunk_pos_from_global(point);
-                            let visited_block_pos = block_pos_from_global(point);
-
-                            if !pending_map.contains_key(&visited_chunk_pos) {
-                                pending_map.insert(visited_chunk_pos, Grid3::new([CHUNK_SIZE; 3]));
-                            }
-
-                            pending_map.get_mut(&visited_chunk_pos).unwrap()[visited_block_pos] = PendingModification{ yield_to_terrain: true, block: Block::new(BlockID::Log) };
-                            if up_chance < 0.50 {
-                                for adj in point.adj_6() {
-                                    let visited_chunk_pos = chunk_pos_from_global(adj);
-                                    let visited_block_pos = block_pos_from_global(adj);
-
-                                    if !pending_map.contains_key(&visited_chunk_pos) {
-                                        pending_map.insert(visited_chunk_pos, Grid3::new([CHUNK_SIZE; 3]));
-                                    }
-                                    if pending_map[&visited_chunk_pos][visited_block_pos].block.id == BlockID::Air {
-                                        pending_map.get_mut(&visited_chunk_pos).unwrap()[visited_block_pos] = PendingModification{ yield_to_terrain: true, block: Block::new(BlockID::Leaves) };
-                                    }
-                                }
-                            }
-
-                            if !modified_chunks.contains(&visited_chunk_pos) {
-                                modified_chunks.push(visited_chunk_pos);
-                                evw_modify.send(PendingModificationEvent { chunk: visited_chunk_pos });
-                            }
-
-                            let local_seed = (**seed as u64).wrapping_mul(point.x.abs() as u64 + 1).wrapping_mul(point.y.abs() as u64 + 1).wrapping_mul(point.z.abs() as u64 + 1);
-                            if Rng::with_seed(local_seed.wrapping_add(1)).f32() < up_chance {
-                                *expansion_points.last_mut().unwrap() = point.up(1);
-                            }
-                            else if Rng::with_seed(local_seed.wrapping_add(2)).f32() < branch_chance {
-                                expansion_points.push(point);
-                                terminate_chance = 0.0;
-                                branch_chance = 0.0;
-                                branch_factor += 0.02;
-                            }
-                            else if Rng::with_seed(local_seed.wrapping_add(3)).f32() < terminate_chance {
-                                expansion_points.pop();
-                            }
-                            else {
-                                let choices = point.adj_6().filter(|p| !visited_positions.contains(p)).collect_vec();
-                                if let Some(choice) = Rng::with_seed(local_seed.wrapping_add(4)).choice(choices) {
-                                    *expansion_points.last_mut().unwrap() = choice;
-                                }
-                                else {
-                                    expansion_points.pop();
-                                }
-                            }
-                            //let direction = Rng::with_seed((**seed) as u64).choice(DIR_6);
-                            //for adj in point.adj_6() {
-
-                            //}
-                            up_chance -= 0.075;
-                            if up_chance < 0.50 {
-                                up_chance = 0.0;
-                                branch_chance += 0.20 - branch_factor;
-                                terminate_chance += 0.01;
-                            }
-
-                            
-                        }
-                        //for visited_pos in visited_positions {
-                            
-                        //    if let
-                        //}
-
+                        evw_gen_tree.send(GenerateTreeEvent(IVec3::new(point_x as i32, point_y as i32 + 1, point_z as i32)));
+                        // TODO: Maybe we want to do this in the tree generation system?
+                        *block_val = Block::new(BlockID::Dirt);
                     }
                 }
                 if (noise_gen.get([point_x, point_y + 5.0, point_z]) > 0.0) || point_y < -5.0 {
                     *block_val = Block::new(BlockID::Stone);
                 }
             }
-
-            //let tree_noise_val = tree_noise.get([point_x, point_y, point_z]);
-            //println!("tree noise value: {}", tree_noise_val);
-            //if tree_noise_val > 0.0 {
-            //    *block_val = Block::new(BlockID::Log);
-            //}
-            //let stone_noise_val = stone_noise.get([point_x, point_y, point_z]);
-            //if stone_noise_val >= 0.05 {
-            //    *block_val = Block::new(BlockID::Stone);
-            //}
         }
 
         if let Some(pending_chunk) = pending_map.get_mut(&ev.chunk) {
@@ -229,8 +143,126 @@ pub fn generate_chunks (
     //next_mapgen_state.set(MapGenState::TempBand);
 }
 
-// TODO: Our code would be a lot cleaner if we had a separate system for handling tree generation. We should do that. We wouldn't even need the "read_modification_events" system anymore!
+pub fn generate_trees(
 
+    //mut commands: Commands,
+
+    mut chunk_query: Query<(&mut Chunk)>,
+
+    seed: Res<RNGSeed>,
+    chunk_map: Res<ChunkMap>,
+    mut pending_map: ResMut<PendingModificationMap>,
+
+    //mut evr_load_chunk: EventReader<LoadChunkEvent>,
+    mut evr_gen_tree: EventReader<GenerateTreeEvent>,
+
+    //mut loader_query: Query<(&mut ChunkLoader)>,
+
+    //mut loading_queue: ResMut<ChunkLoadingQueue>,
+) {
+    for ev in evr_gen_tree.read() {
+        let mut visited_positions = Vec::<IVec3>::new();
+        let mut expansion_points = vec![**ev];
+        let mut up_chance = 1.0;
+        let mut terminate_chance = 0.0;
+        let mut branch_chance = 0.0;
+        let mut branch_factor = 0.0;
+
+        while !expansion_points.is_empty() {
+            let point = expansion_points[expansion_points.len() - 1];
+            visited_positions.push(point);
+
+
+            let mut block_placements = vec![(point, true)];
+
+            if up_chance < 0.50 {
+                let mut adj_points = point.adj_6().map(|p| (p, false)).collect_vec();
+                block_placements.append(&mut adj_points);
+            }
+
+            for (placement_pos, is_log) in block_placements {
+                let chunk_pos = chunk_pos_from_global(placement_pos);
+                let block_pos = block_pos_from_global(placement_pos);
+                //println!("---");
+
+
+                if let Some(chunk_entity) = chunk_map.get(&chunk_pos) {
+                    if let Ok(mut chunk) = chunk_query.get_mut(*chunk_entity) {
+                        //println!("block pre placement: {:?}", chunk[block_pos].id);
+
+                        if chunk[block_pos].id == BlockID::Air || chunk[block_pos].id == BlockID::Leaves {
+                            if is_log {
+                                chunk[block_pos] = Block::new(BlockID::Log);
+                            }
+                            else {
+                                chunk[block_pos] = Block::new(BlockID::Leaves);
+                            }
+                            //println!("block after placement: {:?}", chunk[block_pos].id);
+                            continue;
+                        }
+                    }
+                } 
+                // else
+                if !pending_map.contains_key(&chunk_pos) {
+                    pending_map.insert(chunk_pos, Grid3::new([CHUNK_SIZE; 3]));
+                }
+
+                //println!("block pre modification: {:?}", pending_map[&chunk_pos][block_pos].block.id);
+                if is_log {
+                    pending_map.get_mut(&chunk_pos).unwrap()[block_pos] = PendingModification{ yield_to_terrain: true, block: Block::new(BlockID::Log) };
+                }
+                else if pending_map[&chunk_pos][block_pos].block.id == BlockID::Air {
+                    pending_map.get_mut(&chunk_pos).unwrap()[block_pos] = PendingModification{ yield_to_terrain: true, block: Block::new(BlockID::Leaves) };
+                }
+                //println!("block post modification: {:?}", pending_map[&chunk_pos][block_pos].block.id);
+            }
+            
+
+            
+
+            let local_seed = (**seed as u64).wrapping_mul(point.x.abs() as u64 + 1).wrapping_mul(point.y.abs() as u64 + 1).wrapping_mul(point.z.abs() as u64 + 1);
+            if Rng::with_seed(local_seed.wrapping_add(1)).f32() < up_chance {
+                *expansion_points.last_mut().unwrap() = point.up(1);
+            }
+            else if Rng::with_seed(local_seed.wrapping_add(2)).f32() < branch_chance {
+                expansion_points.push(point);
+                terminate_chance = 0.0;
+                branch_chance = 0.0;
+                branch_factor += 0.02;
+            }
+            else if Rng::with_seed(local_seed.wrapping_add(3)).f32() < terminate_chance {
+                expansion_points.pop();
+            }
+            else {
+                let choices = point.adj_6().filter(|p| !visited_positions.contains(p)).collect_vec();
+                if let Some(choice) = Rng::with_seed(local_seed.wrapping_add(4)).choice(choices) {
+                    *expansion_points.last_mut().unwrap() = choice;
+                }
+                else {
+                    expansion_points.pop();
+                }
+            }
+            //let direction = Rng::with_seed((**seed) as u64).choice(DIR_6);
+            //for adj in point.adj_6() {
+
+            //}
+            up_chance -= 0.075;
+            if up_chance < 0.50 {
+                up_chance = 0.0;
+                branch_chance += 0.20 - branch_factor;
+                terminate_chance += 0.01;
+            }
+
+            
+        }
+        //for visited_pos in visited_positions {
+            
+        //    if let
+        //}
+    }
+}
+
+/*
 pub fn read_modification_events (
     //mut commands: Commands,
 
@@ -262,6 +294,7 @@ pub fn read_modification_events (
         }
     }
 }
+ */
 
 pub fn unload_chunks (
     mut commands: Commands,
@@ -366,6 +399,8 @@ pub struct PendingModificationEvent {
     pub chunk: IVec3,
 }
 
+#[derive(Clone, Copy, Event, Deref, DerefMut)]
+pub struct GenerateTreeEvent(IVec3);
 #[derive(Default, Clone, Deref, DerefMut, Resource)]
 pub struct ChunkMap(HashMap<IVec3, Entity>);
 
