@@ -188,7 +188,7 @@ fn main () {
         (
             player_input_game,
             movement::movement,
-            movement::apply_movement_damping,
+            apply_friction,
             apply_gravity,
             do_physics,
         )
@@ -343,7 +343,6 @@ pub fn setup(
         SpatialBundle::default(),
         movement::CharacterControllerBundle::new(AabbCollider::new(PLAYER_WIDTH, PLAYER_HEIGHT, PLAYER_WIDTH)).with_movement(
             9.0,
-            0.92,
             6.0,
         ),
         LinearVelocity::default(),

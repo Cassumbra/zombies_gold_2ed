@@ -59,19 +59,16 @@ pub struct CharacterControllerBundle {
 #[derive(Bundle)]
 pub struct MovementBundle {
     acceleration: MovementAcceleration,
-    damping: MovementDampingFactor,
     jump_impulse: JumpImpulse,
 }
 
 impl MovementBundle {
     pub const fn new(
         acceleration: f32,
-        damping: f32,
         jump_impulse: f32,
     ) -> Self {
         Self {
             acceleration: MovementAcceleration(acceleration),
-            damping: MovementDampingFactor(damping),
             jump_impulse: JumpImpulse(jump_impulse),
         }
     }
@@ -79,7 +76,7 @@ impl MovementBundle {
 
 impl Default for MovementBundle {
     fn default() -> Self {
-        Self::new(30.0, 0.9, 7.0)
+        Self::new(30.0, 7.0)
     }
 }
 
@@ -106,10 +103,9 @@ impl CharacterControllerBundle {
     pub fn with_movement(
         mut self,
         acceleration: f32,
-        damping: f32,
         jump_impulse: f32,
     ) -> Self {
-        self.movement = MovementBundle::new(acceleration, damping, jump_impulse);
+        self.movement = MovementBundle::new(acceleration, jump_impulse);
         self
     }
 }
@@ -170,14 +166,5 @@ pub fn movement(
             }
         }
         
-    }
-}
-
-/// Slows down movement in the XZ plane.
-pub fn apply_movement_damping(mut query: Query<(&MovementDampingFactor, &mut LinearVelocity)>) {
-    for (damping_factor, mut linear_velocity) in &mut query {
-        // We could use `LinearDamping`, but we don't want to dampen movement along the Y axis
-        linear_velocity.x *= damping_factor.0;
-        linear_velocity.z *= damping_factor.0;
     }
 }

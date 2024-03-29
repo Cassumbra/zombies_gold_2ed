@@ -7,7 +7,7 @@ use noise::{core::worley::{distance_functions::{self, euclidean, euclidean_squar
 //use rand::{seq::SliceRandom, thread_rng};
 use derive_more::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign, };
 use bevy::{ecs::{entity::{EntityMapper, MapEntities}, reflect::ReflectMapEntities}, prelude::*};
-use crate::{directions::{DIR_6, DIR_6_NO_DOWN}, grid3::Grid3, point::GridPoint, Item, ItemID, MoveToSpawn, RNGSeed, CHUNK_SIZE, WORLD_DEPTH, WORLD_HEIGHT, WORLD_SIZE};
+use crate::{directions::{DIR_6, DIR_6_NO_DOWN}, grid3::Grid3, point::GridPoint, Item, ItemID, MoveToSpawn, RNGSeed, Slip, CHUNK_SIZE, WORLD_DEPTH, WORLD_HEIGHT, WORLD_SIZE};
 
 use crate::sparse_grid3::SparseGrid3;
 
@@ -485,7 +485,7 @@ impl Block {
     }
 }
 
-#[derive(Default, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Default, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Reflect)]
 pub enum BlockID {
     #[default] Air,
     Dirt,
@@ -532,6 +532,7 @@ pub struct BlockAttributes {
     pub give_on_damage: Option<Item>,
     pub cost_to_build: [Option<Item>; 3],
     pub solidity: Solidity,
+    pub slip: Slip,
 }
 /*
 impl BlockAttributes {

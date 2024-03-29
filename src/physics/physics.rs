@@ -35,11 +35,15 @@ pub fn do_physics (
         if let Some(collider) = opt_collider {
             let step_count = (frame_velocity * 4.0).abs().max_element().ceil() as i32;
             
+            let mut in_water = false;
 
             //println!("vrooms: {}", frame_velocity);
             //println!("steps: {}", step_count);
 
             let mut surface_contacts = SurfaceContacts(HashSet::new());
+            // Air slip
+            //let mut applied_slip = Vec3::new(0.975, 0.99, 0.975);
+            let mut applied_slip = Vec3::new(0.92, 1.0, 0.92);
 
             for _ in 0..step_count {
                 let frame_velocity = **velocity * time.delta_seconds();
@@ -55,11 +59,21 @@ pub fn do_physics (
 
                     if let Some(chunk_entity) = chunk_map.get(&chunk_position) {
                         if let Ok(chunk) = chunk_query.get(*chunk_entity) {
-                            if chunk[block_position].get_attributes().solidity == Solidity::Solid {
-                                let (penetration, normal) = collider.get_penetration_and_normal(transform.translation, BLOCK_AABB, global_block_position.as_vec3());
-                                if normal != Vec3::ZERO {
-                                    return Some(BlockCollision::new(global_block_position, penetration, normal));
-                                }
+                            match chunk[block_position].get_attributes().solidity {
+                                Solidity::Solid => {
+                                    let (penetration, normal) = collider.get_penetration_and_normal(transform.translation, BLOCK_AABB, global_block_position.as_vec3());
+                                    if normal != Vec3::ZERO {
+                                        return Some(BlockCollision::new(global_block_position, penetration, normal, Some(chunk[block_position].id)));
+                                    }
+                                },
+                                Solidity::NonSolid => {},
+                                Solidity::Water => {
+                                    let mut top_box = *collider;
+                                    top_box.height /= 2.0;
+                                    let mut top_box_pos = transform.translation;
+                                    top_box_pos.y += top_box.height / 2.0;
+                                    in_water = top_box.get_intersection(top_box_pos, BLOCK_AABB, global_block_position.as_vec3());
+                                },
                             }
                             return None;
                         }
@@ -67,7 +81,7 @@ pub fn do_physics (
                     // OOB check
                     let (penetration, normal) = collider.get_penetration_and_normal(transform.translation, BLOCK_AABB, global_block_position.as_vec3());
                     if normal != Vec3::ZERO {
-                        return Some(BlockCollision::new(global_block_position, penetration, normal));
+                        return Some(BlockCollision::new(global_block_position, penetration, normal, None));
                         //println!("OOB at {}", global_block_position);
                     }
 
@@ -77,6 +91,7 @@ pub fn do_physics (
                 collisions.sort_unstable_by(|collision_a, collision_b| collision_b.penetration.partial_cmp(&collision_a.penetration).unwrap());
 
                 let mut collisions_new = Vec::<BlockCollision>::new();
+                if in_water {applied_slip = Vec3::new(0.3, 0.3, 0.3)};
 
                 for (i, collision) in collisions.iter().enumerate() {
                     let (penetration, normal) = if i != 0 {collider.get_penetration_and_normal(transform.translation, BLOCK_AABB, collision.position.as_vec3())} else {(collision.penetration, collision.normal)};
@@ -92,6 +107,7 @@ pub fn do_physics (
 
                             if normal[i] < 0.0 && velocity[i] > 0.0 {
                                 velocity[i] = 0.0;
+                                
 
                                 match i {
                                     0 => surface_contact = SurfaceContact::NegX,
@@ -111,6 +127,27 @@ pub fn do_physics (
                                 }
                             }
 
+                            if surface_contact == SurfaceContact::PosY || surface_contact == SurfaceContact::NegY {
+                                if let Some(id) = collision.id {
+                                    applied_slip.x = id.get_attributes().slip.x;
+                                    applied_slip.z = id.get_attributes().slip.z;
+                                }
+                                else {
+                                    applied_slip.x = 0.0;
+                                    applied_slip.z = 0.0;
+                                }
+                            }
+                            else {
+                                if let Some(id) = collision.id {
+                                    applied_slip.y = id.get_attributes().slip.y;
+                                }
+                                else {
+                                    applied_slip.y = 0.0;
+                                }
+                            }
+
+                            
+
                             surface_contacts.insert(surface_contact);
 
                             //if i != 1 && velocity[i] == 0.0 {
@@ -118,12 +155,14 @@ pub fn do_physics (
                             //}
                         }
 
-                        collisions_new.push(BlockCollision::new(collision.position, penetration, normal));
+                        collisions_new.push(BlockCollision::new(collision.position, penetration, normal, collision.id));
                     }
                 }
             }
 
-            commands.get_entity(entity).unwrap().insert(surface_contacts);
+            let _ = if in_water {surface_contacts.insert(SurfaceContact::Water)} else {false};
+
+            commands.get_entity(entity).unwrap().insert(surface_contacts).insert(AppliedSlip(applied_slip));
             //commands.get_entity(entity).unwrap().insert(BlockCollisions(collisions_new));
             //println!("Collisions: {:?}", collisions_new);
 
@@ -133,6 +172,15 @@ pub fn do_physics (
         }
     }
 }
+
+pub fn apply_friction(mut query: Query<(&AppliedSlip, &mut LinearVelocity)>) {
+    for (applied_slip, mut linear_velocity) in &mut query {
+        // We could use `LinearDamping`, but we don't want to dampen movement along the Y axis
+        println!("slip: {}", **applied_slip);
+        **linear_velocity *= **applied_slip;
+    }
+}
+
 
 // https://gamedev.stackexchange.com/a/49423
 // Imagine writing an answer in JAVASCRIPT
@@ -221,12 +269,29 @@ pub struct BlockCollision {
     pub position: IVec3,
     pub penetration: f32,
     pub normal: Vec3,
+    pub id: Option<BlockID>,
 }
 impl BlockCollision {
-    pub fn new(position: IVec3, penetration: f32, normal: Vec3) -> BlockCollision {
-        BlockCollision {position, penetration, normal}
+    pub fn new(position: IVec3, penetration: f32, normal: Vec3, id: Option<BlockID>) -> BlockCollision {
+        BlockCollision {position, penetration, normal, id}
     }
 }
+
+/// From 0 to 1. Anything else will result in ?strange? behavior.
+#[derive(Component, Clone, Copy, Debug, Reflect, Deref, DerefMut)]
+#[reflect(Component)]
+pub struct Slip(Vec3);
+impl Default for Slip {
+    fn default() -> Self {
+        Self(Vec3::new(0.92, 1.0, 0.92))
+    }
+}
+
+/// The amount of slip applied to this object that it will experience during movement.
+#[derive(Component, Clone, Debug, Reflect, Deref, DerefMut)]
+#[reflect(Component)]
+pub struct AppliedSlip(Vec3);
+
 
 #[derive(Component, Clone, Debug, Reflect)]
 #[reflect(Component)]
@@ -323,6 +388,8 @@ pub enum SurfaceContact{
     NegX,
     PosZ,
     NegZ,
+    // TODO: Should this be part of this enum? or should it be its own component?
+    Water,
 }
 
  /*
