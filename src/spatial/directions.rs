@@ -41,6 +41,7 @@ pub const DOWN_SOUTH_WEST: IVec3 = IVec3::from_array([-1, -1, -1]);
 
 /// Array of six orthogonal grid directions.
 pub const DIR_6: &[IVec3] = &[UP, DOWN, NORTH, SOUTH, EAST, WEST];
+pub const DIR_6_NO_DOWN: &[IVec3] = &[UP, NORTH, SOUTH, EAST, WEST];
 
 /// Array of twenty six adjacent grid directions.
 pub const DIR_26: &[IVec3] = &[

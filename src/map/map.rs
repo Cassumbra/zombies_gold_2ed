@@ -7,7 +7,7 @@ use noise::{core::worley::{distance_functions::{self, euclidean, euclidean_squar
 //use rand::{seq::SliceRandom, thread_rng};
 use derive_more::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign, };
 use bevy::{ecs::{entity::{EntityMapper, MapEntities}, reflect::ReflectMapEntities}, prelude::*};
-use crate::{directions::DIR_6, grid3::Grid3, point::GridPoint, Item, ItemID, MoveToSpawn, RNGSeed, CHUNK_SIZE, WORLD_DEPTH, WORLD_HEIGHT, WORLD_SIZE};
+use crate::{directions::{DIR_6, DIR_6_NO_DOWN}, grid3::Grid3, point::GridPoint, Item, ItemID, MoveToSpawn, RNGSeed, CHUNK_SIZE, WORLD_DEPTH, WORLD_HEIGHT, WORLD_SIZE};
 
 use crate::sparse_grid3::SparseGrid3;
 
@@ -161,12 +161,15 @@ pub fn generate_trees(
     //mut loading_queue: ResMut<ChunkLoadingQueue>,
 ) {
     for ev in evr_gen_tree.read() {
+        let mut local_seed = **seed as u64 + 1;
         let mut visited_positions = Vec::<IVec3>::new();
         let mut expansion_points = vec![**ev];
         let mut up_chance = 1.0;
-        let mut terminate_chance = 0.0;
+        let mut up_done = false;
+        let mut terminate_chance = -0.10;
         let mut branch_chance = 0.0;
         let mut branch_factor = 0.0;
+        let mut last_direction = IVec3::new(0, 1, 0);
 
         while !expansion_points.is_empty() {
             let point = expansion_points[expansion_points.len() - 1];
@@ -219,27 +222,37 @@ pub fn generate_trees(
             
 
             
-
-            let local_seed = (**seed as u64).wrapping_mul(point.x.abs() as u64 + 1).wrapping_mul(point.y.abs() as u64 + 1).wrapping_mul(point.z.abs() as u64 + 1);
+            //println!("local seed: {}", local_seed);
+            local_seed = local_seed.wrapping_mul(point.x.abs() as u64 + 1).wrapping_mul(point.y.abs() as u64 + 1).wrapping_mul(point.z.abs() as u64 + 1);
+            if local_seed == 0 { local_seed += 1};
             if Rng::with_seed(local_seed.wrapping_add(1)).f32() < up_chance {
                 *expansion_points.last_mut().unwrap() = point.up(1);
+                last_direction = IVec3::new(0, 1, 0);
             }
             else if Rng::with_seed(local_seed.wrapping_add(2)).f32() < branch_chance {
+                //println!("branching!");
                 expansion_points.push(point);
-                terminate_chance = 0.0;
+                terminate_chance = -0.10;
                 branch_chance = 0.0;
                 branch_factor += 0.02;
             }
             else if Rng::with_seed(local_seed.wrapping_add(3)).f32() < terminate_chance {
                 expansion_points.pop();
+                //last_direction = *Rng::with_seed(local_seed.wrapping_add(4)).choice(DIR_6_NO_DOWN).unwrap();
             }
             else {
-                let choices = point.adj_6().filter(|p| !visited_positions.contains(p)).collect_vec();
-                if let Some(choice) = Rng::with_seed(local_seed.wrapping_add(4)).choice(choices) {
-                    *expansion_points.last_mut().unwrap() = choice;
+                if Rng::with_seed(local_seed.wrapping_add(4)).f32() > 0.90 && !visited_positions.contains(&(point + last_direction)) {
+                    *expansion_points.last_mut().unwrap() = point + last_direction;
                 }
                 else {
-                    expansion_points.pop();
+                    let choices = point.adj_6_no_down().filter(|p| !visited_positions.contains(p)).collect_vec();
+                    if let Some(choice) = Rng::with_seed(local_seed.wrapping_add(4)).choice(choices) {
+                        *expansion_points.last_mut().unwrap() = choice;
+                        last_direction = point - choice;
+                    }
+                    else {
+                        expansion_points.pop();
+                    }
                 }
             }
             //let direction = Rng::with_seed((**seed) as u64).choice(DIR_6);
@@ -247,18 +260,23 @@ pub fn generate_trees(
 
             //}
             up_chance -= 0.075;
-            if up_chance < 0.50 {
+            if up_chance < 0.50 && !up_done {
+                up_done = true;
                 up_chance = 0.0;
-                branch_chance += 0.20 - branch_factor;
-                terminate_chance += 0.01;
+                for _ in 0..5 {
+                    expansion_points.push(point);
+                }
             }
 
+            if up_done {
+                branch_chance += 0.20 - branch_factor;
+                terminate_chance += 0.10;
+            }
+
+
+            //println!("branch chance: {}", branch_chance);
             
         }
-        //for visited_pos in visited_positions {
-            
-        //    if let
-        //}
     }
 }
 

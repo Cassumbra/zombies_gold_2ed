@@ -5,11 +5,7 @@
 use bevy::math::*;
 
 
-use crate::{
-    directions::{DIR_6, DIR_26},
-    //pivot::PivotedPoint,
-    //Pivot,
-};
+use crate::directions::{DIR_26, DIR_6, DIR_6_NO_DOWN};
  
 
 /// A trait for types representing an integer point on a 2d grid.
@@ -132,6 +128,15 @@ pub trait GridPoint: Clone + Copy {
             i: 0,
             p: self.as_ivec3(),
             arr: DIR_6,
+        }
+    }
+
+    #[inline]
+    fn adj_6_no_down(&self) -> AdjIterator {
+        AdjIterator {
+            i: 0,
+            p: self.as_ivec3(),
+            arr: DIR_6_NO_DOWN,
         }
     }
 }
