@@ -3,7 +3,7 @@ use bevy::{math::Vec3A, prelude::*, utils::{HashMap, HashSet}};
 use fastrand::{Rng, choice};
 use itertools::Itertools;
 //use grid_tree::OctreeU32;
-use noise::{core::worley::{distance_functions::{self, euclidean, euclidean_squared}, worley_3d, ReturnType}, permutationtable::PermutationTable, Blend, Constant, NoiseFn, Perlin, ScalePoint, Worley};
+use noise::{core::worley::{distance_functions::{self, euclidean, euclidean_squared}, worley_3d, ReturnType}, permutationtable::PermutationTable, Blend, Constant, NoiseFn, Perlin, ScalePoint, Value, Worley};
 //use rand::{seq::SliceRandom, thread_rng};
 use derive_more::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign, };
 use bevy::{ecs::{entity::{EntityMapper, MapEntities}, reflect::ReflectMapEntities}, prelude::*};
@@ -55,6 +55,12 @@ pub fn generate_chunks (
 
     //let tree_noise = Worley::new(**seed).set_distance_function(euclidean_squared).set_return_type(ReturnType::Distance).set_frequency(0.025 );
 
+    let tree_noise = Blend::new(
+        ScalePoint::new(Perlin::new(**seed + 1)).set_scale(0.001),
+        WhiteNoise{seed: **seed},
+        Constant::new(0.85),
+    );
+
     let mut chunks_to_load = Vec::new();
 
     for ev in evr_load_chunk.read() {
@@ -105,7 +111,7 @@ pub fn generate_chunks (
                     *block_val = Block::new(BlockID::Grass);
 
                     // Tree!
-                    if Rng::with_seed((**seed as u64).wrapping_mul(point_x.abs() as u64).wrapping_mul(point_y.abs() as u64).wrapping_mul(point_z.abs() as u64)).f32() <= 0.01 {
+                    if tree_noise.get([point_x, point_z]) > 0.80 {
                         evw_gen_tree.send(GenerateTreeEvent(IVec3::new(point_x as i32, point_y as i32 + 1, point_z as i32)));
                         // TODO: Maybe we want to do this in the tree generation system?
                         *block_val = Block::new(BlockID::Dirt);
@@ -581,6 +587,23 @@ impl<const N: usize> NoiseFn<f64, N> for SingleDirectionAxialGradient {
         }
 
         return 0.0;
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct WhiteNoise {
+    pub seed: u32,
+}
+impl<const N: usize> NoiseFn<f64, N> for WhiteNoise {
+    fn get(&self, point: [f64; N]) -> f64 {
+        let mut point = point.to_vec();
+        // TODO: Is cantor pairing overkill for this? IDK. I'm also not sure if I'm properly preserving uniqueness.
+        let mut cantor_pairing = point.pop().unwrap().to_bits();
+        for n in point {
+            let n = n.to_bits();
+            cantor_pairing = (cantor_pairing.wrapping_add(n).wrapping_mul(cantor_pairing.wrapping_add(n).wrapping_add(1)) / 2).wrapping_add(n);
+        }
+        return Rng::with_seed((self.seed as u64).wrapping_mul(cantor_pairing)).f64() * 2.0 - 1.0;
     }
 }
 
