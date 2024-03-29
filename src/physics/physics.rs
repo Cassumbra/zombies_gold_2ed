@@ -72,7 +72,7 @@ pub fn do_physics (
                                     top_box.height /= 2.0;
                                     let mut top_box_pos = transform.translation;
                                     top_box_pos.y += top_box.height / 2.0;
-                                    in_water = top_box.get_intersection(top_box_pos, BLOCK_AABB, global_block_position.as_vec3());
+                                    if !in_water {in_water = top_box.get_intersection(top_box_pos, BLOCK_AABB, global_block_position.as_vec3())};
                                 },
                             }
                             return None;
@@ -91,7 +91,7 @@ pub fn do_physics (
                 collisions.sort_unstable_by(|collision_a, collision_b| collision_b.penetration.partial_cmp(&collision_a.penetration).unwrap());
 
                 let mut collisions_new = Vec::<BlockCollision>::new();
-                if in_water {applied_slip = Vec3::new(0.3, 0.3, 0.3)};
+                if in_water {applied_slip = Vec3::new(0.89, 0.75, 0.89)};
 
                 for (i, collision) in collisions.iter().enumerate() {
                     let (penetration, normal) = if i != 0 {collider.get_penetration_and_normal(transform.translation, BLOCK_AABB, collision.position.as_vec3())} else {(collision.penetration, collision.normal)};
@@ -175,8 +175,7 @@ pub fn do_physics (
 
 pub fn apply_friction(mut query: Query<(&AppliedSlip, &mut LinearVelocity)>) {
     for (applied_slip, mut linear_velocity) in &mut query {
-        // We could use `LinearDamping`, but we don't want to dampen movement along the Y axis
-        println!("slip: {}", **applied_slip);
+        //println!("slip: {}", **applied_slip);
         **linear_velocity *= **applied_slip;
     }
 }

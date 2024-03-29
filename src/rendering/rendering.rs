@@ -60,6 +60,7 @@ pub fn update_chunk_meshes (
                 crate::BlockID::Air => EMPTY,
                 // TODO: We should make this use our attributes, later, once we have more blocks that are translucent.
                 crate::BlockID::Leaves => TRANSLUCENT,
+                crate::BlockID::Water => TRANSLUCENT,
                 _ => FULL
             }
         }

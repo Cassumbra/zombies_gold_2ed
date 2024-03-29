@@ -121,6 +121,9 @@ pub fn generate_chunks (
                     *block_val = Block::new(BlockID::Stone);
                 }
             }
+            if point_y < 0.0 && block_val.id == BlockID::Air {
+                *block_val = Block::new(BlockID::Water)
+            }
         }
 
         if let Some(pending_chunk) = pending_map.get_mut(&ev.chunk) {
@@ -494,6 +497,7 @@ pub enum BlockID {
     StoneBrick,
     Log,
     Leaves,
+    Water,
 }
 impl BlockID {
     pub fn get_attributes(self) -> BlockAttributes {
@@ -506,7 +510,7 @@ impl BlockID {
             // Logs will have special behavior for how they get mined, most likely. (Treefelling)
             BlockID::Log => BlockAttributes { health: 2, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 4)), give_on_damage: Some(Item{id: ItemID::Wood, amount: 32}), ..default() },
             BlockID::Leaves => BlockAttributes { health: 1, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 5)), solidity: Solidity::NonSolid, ..default() },
-
+            BlockID::Water => BlockAttributes {health: 0, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 7)), solidity: Solidity::Water, ..default()}
             
         }
     }
