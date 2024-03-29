@@ -1,7 +1,7 @@
 use bevy::{prelude::*, utils::HashSet};
 use itertools::{iproduct, izip};
 
-use crate::{block_pos_from_global, chunk_pos_from_global, BlockID, Chunk, ChunkMap};
+use crate::{block_pos_from_global, chunk_pos_from_global, BlockID, Chunk, ChunkMap, Solidity};
 
 const BLOCK_AABB: AabbCollider = AabbCollider{ width: 1.0, height: 1.0, length: 1.0 };
 
@@ -55,7 +55,7 @@ pub fn do_physics (
 
                     if let Some(chunk_entity) = chunk_map.get(&chunk_position) {
                         if let Ok(chunk) = chunk_query.get(*chunk_entity) {
-                            if chunk[block_position].id != BlockID::Air {
+                            if chunk[block_position].get_attributes().solidity == Solidity::Solid {
                                 let (penetration, normal) = collider.get_penetration_and_normal(transform.translation, BLOCK_AABB, global_block_position.as_vec3());
                                 if normal != Vec3::ZERO {
                                     return Some(BlockCollision::new(global_block_position, penetration, normal));

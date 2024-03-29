@@ -498,14 +498,14 @@ pub enum BlockID {
 impl BlockID {
     pub fn get_attributes(self) -> BlockAttributes {
         match self {
-            BlockID::Air => BlockAttributes { health: 0, ..default()  },
+            BlockID::Air => BlockAttributes { health: 0, solidity: Solidity::NonSolid, ..default()  },
             BlockID::Dirt => BlockAttributes { health: 3, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 0)), ..default() },
             BlockID::Grass => BlockAttributes { health: 1, tex_coords: TextureCoords::asymmetric_y(IVec2::new(0, 1), IVec2::new(0, 0), IVec2::new(1, 1)), breaks_into: BlockID::Dirt, ..default() },
             BlockID::Stone => BlockAttributes { health: 5, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 2)), give_on_damage: Some(Item{ id: ItemID::Stone, amount: 16, }), ..default() },
             BlockID::StoneBrick => BlockAttributes { health: 5, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 3)), give_on_damage: Some(Item{ id: ItemID::Stone, amount: 2 }), cost_to_build: [Some(Item::new(ItemID::Stone, 16)), None, None],  ..default() },
             // Logs will have special behavior for how they get mined, most likely. (Treefelling)
             BlockID::Log => BlockAttributes { health: 2, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 4)), give_on_damage: Some(Item{id: ItemID::Wood, amount: 32}), ..default() },
-            BlockID::Leaves => BlockAttributes { health: 1, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 5)), ..default() },
+            BlockID::Leaves => BlockAttributes { health: 1, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 5)), solidity: Solidity::NonSolid, ..default() },
 
             
         }
@@ -531,6 +531,7 @@ pub struct BlockAttributes {
     pub breaks_into: BlockID,
     pub give_on_damage: Option<Item>,
     pub cost_to_build: [Option<Item>; 3],
+    pub solidity: Solidity,
 }
 /*
 impl BlockAttributes {
@@ -539,6 +540,13 @@ impl BlockAttributes {
     }
 }
  */
+
+ #[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+ pub enum Solidity {
+    #[default] Solid,
+    NonSolid,
+    Water,
+ }
 
 // We might as well make this a struct instead of an enum, since it'll be the same size either way, and this will let us clarify what is what better.
 #[derive(Default, Clone, Copy)]
