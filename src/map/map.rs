@@ -299,40 +299,6 @@ pub fn generate_trees(
     }
 }
 
-/*
-pub fn read_modification_events (
-    //mut commands: Commands,
-
-    mut chunk_query: Query<(&mut Chunk)>,
-
-    //seed: Res<RNGSeed>,
-    chunk_map: Res<ChunkMap>,
-    mut pending_map: ResMut<PendingModificationMap>,
-
-    //mut evr_load_chunk: EventReader<LoadChunkEvent>,
-    mut evr_modify: EventReader<PendingModificationEvent>,
-
-    //mut loader_query: Query<(&mut ChunkLoader)>,
-
-    //mut loading_queue: ResMut<ChunkLoadingQueue>,
-) {
-    for ev in evr_modify.read() {
-        if let Some(pending_chunk) = pending_map.get_mut(&ev.chunk) {
-            if let Some(chunk_entity) = chunk_map.get(&ev.chunk) {
-                if let Ok(mut chunk) = chunk_query.get_mut(*chunk_entity) {
-                    for (position, modification) in pending_chunk.iter_3d_mut() {
-                        if !modification.yield_to_terrain || chunk[position].id == BlockID::Air {
-                            chunk[position] = modification.block;
-                        }
-                    }
-                }
-            }
-            
-        }
-    }
-}
- */
-
 pub fn unload_chunks (
     mut commands: Commands,
 

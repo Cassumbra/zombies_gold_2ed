@@ -64,7 +64,7 @@ pub fn update_chunk_meshes (
         
         let offset = **ev * CHUNK_SIZE;
 
-        for (x, y, z) in iproduct!(-1..=15, -1..=15, -1..=15) {
+        for (x, y, z) in iproduct!(-1..=CHUNK_SIZE, -1..=CHUNK_SIZE, -1..=CHUNK_SIZE) {
             let global_block_position = offset + IVec3::new(x, y, z);
             let chunk_position = chunk_pos_from_global(global_block_position);
             let block_position = block_pos_from_global(global_block_position);
