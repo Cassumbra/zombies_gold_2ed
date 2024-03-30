@@ -4,8 +4,9 @@ use bevy::prelude::*;
 use bevy::render::mesh::{Indices, MeshVertexAttribute, PrimitiveTopology, VertexAttributeValues};
 use bevy::render::render_asset::RenderAssetUsages;
 use bevy::render::view::NoFrustumCulling;
+use itertools::iproduct;
 
-use crate::{Atlas, Chunk, TextureAtlas, CHUNK_SIZE};
+use crate::{block_pos_from_global, chunk_pos_from_global, Atlas, Chunk, ChunkMap, TextureAtlas, UpdateChunkEvent, CHUNK_SIZE};
 
 use block_mesh::ndshape::{ConstShape, ConstShape3u32};
 use block_mesh::{greedy_quads, visible_block_faces, GreedyQuadsBuffer, MergeVoxel, UnitQuadBuffer, UnorientedQuad, Voxel, VoxelVisibility, RIGHT_HANDED_Y_UP_CONFIG};
@@ -39,29 +40,48 @@ type ChunkShape = ConstShape3u32<18, 18, 18>;
 pub fn update_chunk_meshes (
     mut commands: Commands,
 
-    // TODO: If we end up having chunk changes that don't result in rendering changes, this could end up being wasted performance.
-    //       Using some events might be a good idea...
-    query: Query<(Entity, &Chunk), Or<(Added<Chunk>, Changed<Chunk>)>>,
+    mut evr_update_chunk: EventReader<UpdateChunkEvent>,
 
     atlas: Res<Atlas>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
+    mut chunk_map: ResMut<ChunkMap>,
 ) {
-    for (entity, chunk) in query.iter() {
-        //if commands.get_entity(entity).is_none() {
-        //    continue
-        //}
+    let mut seen_events = Vec::new();
+
+    for (ev) in evr_update_chunk.read() {
+        if !chunk_map.contains_key(&**ev) {
+            continue
+        }
+        if seen_events.contains(ev) {
+            continue
+        }
+
+        seen_events.push(*ev);
 
         // TODO: Default to FULL instead and optimize by providing a buffer where possible
         let mut voxels = [EMPTY; ChunkShape::SIZE as usize];
         
-        for (i, block) in chunk.iter_3d() {
-            voxels[ChunkShape::linearize([(i.x + 1) as u32, (i.y + 1) as u32, (i.z + 1) as u32]) as usize] = match block.id {
-                crate::BlockID::Air => EMPTY,
-                // TODO: We should make this use our attributes, later, once we have more blocks that are translucent.
-                crate::BlockID::Leaves => TRANSLUCENT,
-                crate::BlockID::Water => TRANSLUCENT,
-                _ => FULL
+        let offset = **ev * CHUNK_SIZE;
+
+        for (x, y, z) in iproduct!(-1..=15, -1..=15, -1..=15) {
+            let global_block_position = offset + IVec3::new(x, y, z);
+            let chunk_position = chunk_pos_from_global(global_block_position);
+            let block_position = block_pos_from_global(global_block_position);
+
+
+            voxels[ChunkShape::linearize([(x + 1) as u32, (y + 1) as u32, (z + 1) as u32]) as usize] = 
+            if let Some(chunk) = chunk_map.get(&chunk_position) {
+                match chunk.blocks[block_position].id {
+                    crate::BlockID::Air => EMPTY,
+                    // TODO: We should make this use our attributes, later, once we have more blocks that are translucent.
+                    crate::BlockID::Leaves => TRANSLUCENT,
+                    crate::BlockID::Water => TRANSLUCENT,
+                    _ => FULL
+                }
+            }
+            else {
+                FULL
             }
         }
 
@@ -91,7 +111,7 @@ pub fn update_chunk_meshes (
                 positions.extend_from_slice(&face.quad_mesh_positions(&quad.into(), 1.0));
                 normals.extend_from_slice(&face.quad_mesh_normals());
 
-                let block = chunk[UVec3::from(quad.minimum) - UVec3::new(1, 1, 1)];
+                let block = chunk_map[&**ev].blocks[UVec3::from(quad.minimum) - UVec3::new(1, 1, 1)];
                 let attributes = block.get_attributes();
                 let normal = face.signed_normal();
 
@@ -185,7 +205,7 @@ pub fn update_chunk_meshes (
              */
         });
         */
-        commands.entity(entity)
+        commands.entity(chunk_map[&**ev].render_entity.unwrap())
             .try_insert(mesh_handle)
             .try_insert(materials.add(material))
             .try_insert(Visibility::default())

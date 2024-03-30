@@ -23,7 +23,6 @@ pub fn do_physics (
     mut commands: Commands,
 
     mut query: Query<(Entity, &mut Transform, &mut LinearVelocity, Option<&AabbCollider>,)>,
-    mut chunk_query: Query<(&Chunk)>,
 
     time: Res<Time>,
     chunk_map: Res<ChunkMap>,
@@ -57,26 +56,24 @@ pub fn do_physics (
                     let chunk_position = chunk_pos_from_global(global_block_position);
                     let block_position = block_pos_from_global(global_block_position);
 
-                    if let Some(chunk_entity) = chunk_map.get(&chunk_position) {
-                        if let Ok(chunk) = chunk_query.get(*chunk_entity) {
-                            match chunk[block_position].get_attributes().solidity {
-                                Solidity::Solid => {
-                                    let (penetration, normal) = collider.get_penetration_and_normal(transform.translation, BLOCK_AABB, global_block_position.as_vec3());
-                                    if normal != Vec3::ZERO {
-                                        return Some(BlockCollision::new(global_block_position, penetration, normal, Some(chunk[block_position].id)));
-                                    }
-                                },
-                                Solidity::NonSolid => {},
-                                Solidity::Water => {
-                                    let mut top_box = *collider;
-                                    top_box.height /= 2.0;
-                                    let mut top_box_pos = transform.translation;
-                                    top_box_pos.y += top_box.height / 2.0;
-                                    if !in_water {in_water = top_box.get_intersection(top_box_pos, BLOCK_AABB, global_block_position.as_vec3())};
-                                },
-                            }
-                            return None;
+                    if let Some(chunk) = chunk_map.get(&chunk_position) {
+                        match chunk.blocks[block_position].get_attributes().solidity {
+                            Solidity::Solid => {
+                                let (penetration, normal) = collider.get_penetration_and_normal(transform.translation, BLOCK_AABB, global_block_position.as_vec3());
+                                if normal != Vec3::ZERO {
+                                    return Some(BlockCollision::new(global_block_position, penetration, normal, Some(chunk.blocks[block_position].id)));
+                                }
+                            },
+                            Solidity::NonSolid => {},
+                            Solidity::Water => {
+                                let mut top_box = *collider;
+                                top_box.height /= 2.0;
+                                let mut top_box_pos = transform.translation;
+                                top_box_pos.y += top_box.height / 2.0;
+                                if !in_water {in_water = top_box.get_intersection(top_box_pos, BLOCK_AABB, global_block_position.as_vec3())};
+                            },
                         }
+                        return None;
                     }
                     // OOB check
                     let (penetration, normal) = collider.get_penetration_and_normal(transform.translation, BLOCK_AABB, global_block_position.as_vec3());

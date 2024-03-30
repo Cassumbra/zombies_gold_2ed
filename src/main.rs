@@ -219,7 +219,6 @@ const SPAWN_CHUNK: IVec3 = IVec3::new(5, 0, 0);
 
 pub fn move_to_spawn (
     mut query: Query<(Entity, &mut Transform), With<MoveToSpawn>>,
-    chunk_query: Query<(&Chunk)>,
 
     chunk_map: Res<ChunkMap>,
 
@@ -231,20 +230,16 @@ pub fn move_to_spawn (
     'entity_checks: for (entity, mut transform) in &mut query {
         'chunks: for chunk_y in (0..=WORLD_HEIGHT).rev() {
             //println!("chunk_y: {}", chunk_y);
-            if let Some(chunk_entity) = chunk_map.get(&IVec3::new(SPAWN_CHUNK.x, chunk_y, SPAWN_CHUNK.z)) {
-                //println!("eee");
-                if let Ok(chunk) = chunk_query.get(*chunk_entity) {
-                    //println!("valid entity ! eee!!");
-                    for (y, block) in chunk.iter_column(0, 0).enumerate().rev() {
-                        if block.id != BlockID::Air {
-                            transform.translation = IVec3::new(SPAWN_CHUNK.x * CHUNK_SIZE, chunk_y * CHUNK_SIZE + y as i32 + 2, SPAWN_CHUNK.z * CHUNK_SIZE).as_vec3();
-                            //println!("translation: {}", transform.translation);
-                            commands.entity(entity).remove::<MoveToSpawn>();
-                            continue 'entity_checks
-                        }
+            if let Some(chunk) = chunk_map.get(&IVec3::new(SPAWN_CHUNK.x, chunk_y, SPAWN_CHUNK.z)) {
+                for (y, block) in chunk.blocks.iter_column(0, 0).enumerate().rev() {
+                    if block.id != BlockID::Air {
+                        transform.translation = IVec3::new(SPAWN_CHUNK.x * CHUNK_SIZE, chunk_y * CHUNK_SIZE + y as i32 + 2, SPAWN_CHUNK.z * CHUNK_SIZE).as_vec3();
+                        //println!("translation: {}", transform.translation);
+                        commands.entity(entity).remove::<MoveToSpawn>();
+                        continue 'entity_checks
                     }
-                    continue 'chunks
                 }
+                continue 'chunks
             }
             evw_load_chunk.send(LoadChunkEvent { chunk: IVec3::new(SPAWN_CHUNK.x, chunk_y, SPAWN_CHUNK.z), load_reason: LoadReason::Spawning(entity) });
             continue 'entity_checks

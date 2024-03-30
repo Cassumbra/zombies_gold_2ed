@@ -1,7 +1,7 @@
 use std::{collections::VecDeque, ops::{Range, RangeBounds}};
-use bevy::{math::Vec3A, prelude::*, utils::{HashMap, HashSet}};
+use bevy::{math::Vec3A, prelude::*, render, utils::{HashMap, HashSet}};
 use fastrand::{Rng, choice};
-use itertools::Itertools;
+use itertools::{iproduct, Itertools};
 //use grid_tree::OctreeU32;
 use noise::{core::worley::{distance_functions::{self, euclidean, euclidean_squared}, worley_3d, ReturnType}, permutationtable::PermutationTable, Blend, Constant, NoiseFn, Perlin, ScalePoint, Value, Worley};
 //use rand::{seq::SliceRandom, thread_rng};
@@ -26,7 +26,8 @@ impl Plugin for MapPlugin {
             .init_resource::<PendingModificationMap>()
             .init_resource::<ChunkLoadingQueue>()
             .add_event::<LoadChunkEvent>()
-            .add_event::<PendingModificationEvent>()
+            .add_event::<LoadReasonChangeEvent>()
+            .add_event::<UpdateChunkEvent>()
             .add_event::<GenerateTreeEvent>();
     }
 }
@@ -42,6 +43,7 @@ pub fn generate_chunks (
 
     mut evr_load_chunk: EventReader<LoadChunkEvent>,
     mut evw_gen_tree: EventWriter<GenerateTreeEvent>,
+    mut evw_update_chunk: EventWriter<UpdateChunkEvent>,
 
     mut loader_query: Query<(&mut ChunkLoader)>,
 
@@ -70,11 +72,8 @@ pub fn generate_chunks (
         }
 
         // Check if there's already an entity here.
-        if let Some(chunk_entity) = chunk_map.get(&ev.chunk) {
-            // Check to see if the entity is valid.
-            if commands.get_entity(*chunk_entity).is_some() {
-                continue
-            }
+        if chunk_map.contains_key(&ev.chunk) {
+            continue
         }
 
         match ev.load_reason {
@@ -93,12 +92,24 @@ pub fn generate_chunks (
     for ev in chunks_to_load.iter() {
         //println!("loading: {:?}", ev.chunk);
 
-        let mut chunk = Chunk(Grid3::filled(Block::new(BlockID::Air), [CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE]));
+        let render_entity = Some(commands.spawn(Transform::from_translation((ev.chunk * CHUNK_SIZE).as_vec3()))
+                                    .insert(GlobalTransform::default())
+                                    .id());
+
+        let water_render_entity = Some(commands.spawn(Transform::from_translation((ev.chunk * CHUNK_SIZE).as_vec3()))
+                                    .insert(GlobalTransform::default())
+                                    .id());
+
+        let mut chunk = Chunk { blocks: Grid3::filled(Block::new(BlockID::Air), [CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE]),
+                                load_reasons: HashSet::from([ev.load_reason]),
+                                render_entity,
+                                water_render_entity
+                              };
     
         let offset = ev.chunk * CHUNK_SIZE;
 
         // Set initial values
-        for (position, block_val) in chunk.iter_3d_mut() {
+        for (position, block_val) in chunk.blocks.iter_3d_mut() {
             let point_x = (offset.x + position.x) as f64;
             let point_y = (offset.y + position.y) as f64;
             let point_z = (offset.z + position.z) as f64;
@@ -128,24 +139,24 @@ pub fn generate_chunks (
 
         if let Some(pending_chunk) = pending_map.get_mut(&ev.chunk) {
             for (position, modification) in pending_chunk.iter_3d_mut() {
-                if !modification.yield_to_terrain || chunk[position].id == BlockID::Air {
-                    chunk[position] = modification.block;
+                if !modification.yield_to_terrain || chunk.blocks[position].id == BlockID::Air {
+                    chunk.blocks[position] = modification.block;
                 }
             }
         }
         
-        let chunk_entity = commands.spawn(chunk)
-            .insert(LoadReasonList(HashSet::from([ev.load_reason])))
-            .insert(Transform::from_translation((ev.chunk * CHUNK_SIZE).as_vec3()))
-            .insert(GlobalTransform::default())
-            .id();
-        chunk_map.insert(ev.chunk, chunk_entity);
+        chunk_map.insert(ev.chunk, chunk);
         let loader_entity = match ev.load_reason {
             LoadReason::Loader(entity) => entity,
             LoadReason::Spawning(entity) => entity,
         };
         if let Ok(mut loader) = loader_query.get_mut(loader_entity) {
-            loader.load_list.push(chunk_entity);
+            loader.load_list.push(ev.chunk);
+        }
+
+        evw_update_chunk.send(UpdateChunkEvent(ev.chunk));
+        for adj in ev.chunk.adj_6() {
+            evw_update_chunk.send(UpdateChunkEvent(adj));
         }
     }
 
@@ -153,22 +164,15 @@ pub fn generate_chunks (
 }
 
 pub fn generate_trees(
-
-    //mut commands: Commands,
-
-    mut chunk_query: Query<(&mut Chunk)>,
-
     seed: Res<RNGSeed>,
-    chunk_map: Res<ChunkMap>,
+    mut chunk_map: ResMut<ChunkMap>,
     mut pending_map: ResMut<PendingModificationMap>,
 
-    //mut evr_load_chunk: EventReader<LoadChunkEvent>,
     mut evr_gen_tree: EventReader<GenerateTreeEvent>,
-
-    //mut loader_query: Query<(&mut ChunkLoader)>,
-
-    //mut loading_queue: ResMut<ChunkLoadingQueue>,
+    mut evw_update_chunk: EventWriter<UpdateChunkEvent>,
 ) {
+    let mut chunk_updates = Vec::new();
+
     for ev in evr_gen_tree.read() {
         let mut local_seed = **seed as u64 + 1;
         let mut visited_positions = Vec::<IVec3>::new();
@@ -198,20 +202,16 @@ pub fn generate_trees(
                 //println!("---");
 
 
-                if let Some(chunk_entity) = chunk_map.get(&chunk_pos) {
-                    if let Ok(mut chunk) = chunk_query.get_mut(*chunk_entity) {
-                        //println!("block pre placement: {:?}", chunk[block_pos].id);
+                if let Some(chunk) = chunk_map.get_mut(&chunk_pos) {
 
-                        if chunk[block_pos].id == BlockID::Air || chunk[block_pos].id == BlockID::Leaves {
-                            if is_log {
-                                chunk[block_pos] = Block::new(BlockID::Log);
-                            }
-                            else {
-                                chunk[block_pos] = Block::new(BlockID::Leaves);
-                            }
-                            //println!("block after placement: {:?}", chunk[block_pos].id);
-                            continue;
+                    if chunk.blocks[block_pos].id == BlockID::Air || chunk.blocks[block_pos].id == BlockID::Leaves {
+                        if is_log {
+                            chunk.blocks[block_pos] = Block::new(BlockID::Log);
                         }
+                        else {
+                            chunk.blocks[block_pos] = Block::new(BlockID::Leaves);
+                        }
+                        continue;
                     }
                 } 
                 // else
@@ -227,9 +227,15 @@ pub fn generate_trees(
                     pending_map.get_mut(&chunk_pos).unwrap()[block_pos] = PendingModification{ yield_to_terrain: true, block: Block::new(BlockID::Leaves) };
                 }
                 //println!("block post modification: {:?}", pending_map[&chunk_pos][block_pos].block.id);
+
+                for event in update_chunk_events_from_global(placement_pos) {
+                    if !chunk_updates.contains(&event) {
+                        chunk_updates.push(event);
+                    }
+                }
             }
             
-
+            
             
             //println!("local seed: {}", local_seed);
             local_seed = local_seed.wrapping_mul(point.x.abs() as u64 + 1).wrapping_mul(point.y.abs() as u64 + 1).wrapping_mul(point.z.abs() as u64 + 1);
@@ -286,6 +292,10 @@ pub fn generate_trees(
             //println!("branch chance: {}", branch_chance);
             
         }
+
+        for event in chunk_updates.iter() {
+            evw_update_chunk.send(*event);
+        }
     }
 }
 
@@ -326,20 +336,25 @@ pub fn read_modification_events (
 pub fn unload_chunks (
     mut commands: Commands,
 
-    //mut chunk_map: ResMut<ChunkMap>,
+    mut chunk_map: ResMut<ChunkMap>,
 
-    chunk_query: Query<(Entity, &LoadReasonList), Changed<LoadReasonList>>,
+    mut evr_load_reason: EventReader<LoadReasonChangeEvent>,
 ) {
-    for (chunk_entity, load_reason_list) in &chunk_query {
-        //println!("load reasons: {:?}", **load_reason_list);
-        if load_reason_list.is_empty() {
-            commands.entity(chunk_entity).despawn();
-            // TODO: The fact that we don't remove the entity from the chunk_map means we have to test to see if the entity in the map is actually valid in a lot of different places.
-            //       This kinda sucks, and we should probably fix it!
+    for (ev) in evr_load_reason.read() {
+        if let Some(chunk) = chunk_map.get_mut(&**ev) {
+            if chunk.load_reasons.is_empty() {
+                if let Some(render_entity) = chunk.render_entity {
+                    commands.entity(render_entity).despawn();
+                }
+                if let Some(water_render_entity) = chunk.water_render_entity {
+                    commands.entity(water_render_entity).despawn();
+                }
+                chunk_map.remove(&**ev);
+                //println!("yeet...");
+            }
         }
     }
 }
-
 
 pub fn update_chunk_positions (
     mut query: Query<(&GlobalTransform, &mut ChunkPosition), (Changed<GlobalTransform>)>,
@@ -357,13 +372,13 @@ pub fn update_chunk_positions (
 
 pub fn update_chunk_loaders (
     mut query: Query<(Entity, &ChunkPosition, &mut ChunkLoader), (Changed<ChunkPosition>, Without<MoveToSpawn>)>,
-    mut chunk_query: Query<(&mut LoadReasonList)>,
 
-    chunk_map: Res<ChunkMap>,
+    mut chunk_map: ResMut<ChunkMap>,
 
-    //mut commands: Commands,
+    mut commands: Commands,
 
     mut evw_load_chunk: EventWriter<LoadChunkEvent>,
+    mut evw_load_reason: EventWriter<LoadReasonChangeEvent>,
 ) {
     // TODO: Not sure if "buffer" is the right word. Also, maybe this should be an attribute of the ChunkLoader type? Or maybe a const?
     let buffer_range = 1;
@@ -371,9 +386,10 @@ pub fn update_chunk_loaders (
     for (entity, position, mut loader) in &mut query {
         // Reset whatever it is we're currently loading.
         // TODO: We should be selectively removing things, maybe. and then we can use range + n for the area where we wont load/generate chunks, but we'll still keep chunks already loaded/generated loaded.
-        for chunk_entity in loader.load_list.iter() {
-            if let Ok(mut load_reason_list) = chunk_query.get_mut(*chunk_entity) {
-                load_reason_list.remove(&LoadReason::Loader(entity));
+        for chunk_pos in loader.load_list.iter() {
+            if let Some(chunk) = chunk_map.get_mut(chunk_pos) {
+                chunk.load_reasons.remove(&LoadReason::Loader(entity));
+                evw_load_reason.send(LoadReasonChangeEvent(*chunk_pos));
             }
         }
         loader.load_list = vec![];
@@ -384,31 +400,27 @@ pub fn update_chunk_loaders (
         let min_corner_buffered = min_corner - buffer_range;
         let max_corner_buffered = max_corner + buffer_range;
         //let y = 0;
-        for x in min_corner_buffered.x..=max_corner_buffered.x {
-            for y in min_corner_buffered.y..=max_corner_buffered.y {
-                for z in min_corner_buffered.z..=max_corner_buffered.z {
-                    let mut load_success = false;
+        for (x, y, z) in iproduct!(min_corner_buffered.x..=max_corner_buffered.x,
+                                   min_corner_buffered.y..=max_corner_buffered.y,
+                                   min_corner_buffered.z..=max_corner_buffered.z) {
+                                    
+            let mut load_success = false;
 
-                    if let Some(chunk_entity) = chunk_map.get(&IVec3::new(x, y, z)) {
-                        if let Ok(mut load_reason_list) = chunk_query.get_mut(*chunk_entity) {
-                            // Try to remove this. Just in case.
-                            load_reason_list.remove(&LoadReason::Spawning(entity));
+                if let Some(chunk) = chunk_map.get_mut(&IVec3::new(x, y, z)) {
+                    // Try to remove this. Just in case.
+                    chunk.load_reasons.remove(&LoadReason::Spawning(entity));
 
-                            load_reason_list.insert(LoadReason::Loader(entity));
+                    chunk.load_reasons.insert(LoadReason::Loader(entity));
 
-                            loader.load_list.push(*chunk_entity);
+                    loader.load_list.push(IVec3::new(x, y, z));
 
-                            load_success = true;
-                        }
-                    }
-                    // We keep everything in the range and the buffer range loaded, but we only *start* loading if chunks are in the load range proper.
-                    if !load_success && (min_corner.x..=max_corner.x).contains(&x) && (min_corner.y..=max_corner.y).contains(&y) && (min_corner.z..=max_corner.z).contains(&z) {
-                        evw_load_chunk.send(LoadChunkEvent { chunk: IVec3::new(x, y, z), load_reason: LoadReason::Loader(entity) });
-                    }
+                    load_success = true;
                 }
+            // We keep everything in the range and the buffer range loaded, but we only *start* loading if chunks are in the load range proper.
+            if !load_success && (min_corner.x..=max_corner.x).contains(&x) && (min_corner.y..=max_corner.y).contains(&y) && (min_corner.z..=max_corner.z).contains(&z) {
+                evw_load_chunk.send(LoadChunkEvent { chunk: IVec3::new(x, y, z), load_reason: LoadReason::Loader(entity) });
             }
         }
-
     }
 }
 
@@ -421,15 +433,22 @@ pub struct LoadChunkEvent {
     pub load_reason: LoadReason,
 }
 
-#[derive(Clone, Copy, Event)]
-pub struct PendingModificationEvent {
-    pub chunk: IVec3,
-}
+#[derive(Clone, Copy, Event, Deref, DerefMut, PartialEq, Eq)]
+pub struct LoadReasonChangeEvent(IVec3);
+
+//#[derive(Clone, Copy, Event)]
+//pub struct PendingModificationEvent {
+//    pub chunk: IVec3,
+//}
+
+#[derive(Clone, Copy, Event, Deref, DerefMut, PartialEq, Eq)]
+pub struct UpdateChunkEvent(IVec3);
+
 
 #[derive(Clone, Copy, Event, Deref, DerefMut)]
 pub struct GenerateTreeEvent(IVec3);
 #[derive(Default, Clone, Deref, DerefMut, Resource)]
-pub struct ChunkMap(HashMap<IVec3, Entity>);
+pub struct ChunkMap(HashMap<IVec3, Chunk>);
 
 #[derive(Clone)]
 pub struct PendingModification {
@@ -450,15 +469,15 @@ pub struct PendingModificationMap(HashMap<IVec3, Grid3<PendingModification>>);
 #[derive(Default, Clone, Component)]
 pub struct ChunkLoader{
     pub range: i32,
-    pub load_list: Vec<Entity>,
+    pub load_list: Vec<IVec3>,
 }
 
 /// Required for chunkloading entities. May have other purposes later.
 #[derive(Default, Clone, Deref, DerefMut, Component)]
 pub struct ChunkPosition(IVec3);
 
-#[derive(Default, Clone, Deref, DerefMut, Component, Debug)]
-pub struct LoadReasonList(HashSet<LoadReason>);
+//#[derive(Default, Clone, Deref, DerefMut, Component, Debug)]
+//pub struct LoadReasonList(HashSet<LoadReason>);
 
 #[derive(Copy, Clone, Eq, Hash, PartialEq, Debug)]
 pub enum LoadReason {
@@ -466,8 +485,13 @@ pub enum LoadReason {
     Spawning(Entity), // TODO: Refactor to "move"? or "teleport"? not sure if we should
 }
 
-#[derive(Default, Clone, Deref, DerefMut, Component)]
-pub struct Chunk(Grid3<Block>);
+#[derive(Clone)]
+pub struct Chunk {
+    pub blocks: Grid3<Block>,
+    pub load_reasons: HashSet<LoadReason>,
+    pub render_entity: Option<Entity>,
+    pub water_render_entity: Option<Entity>,
+}
 
 
 // TODO: Optimization: If we're using too much space, we can try and use u8s instead of enums. :)
@@ -640,6 +664,28 @@ pub fn block_pos_from_global (global_position: IVec3) -> IVec3 {
     if block_pos.z < 0 {block_pos.z += CHUNK_SIZE};
 
     block_pos
+}
+
+pub fn update_chunk_events_from_global (global_position: IVec3) -> Vec<UpdateChunkEvent> {
+    let chunk_position = chunk_pos_from_global(global_position);
+    let block_position = block_pos_from_global(global_position);
+
+    let mut events = vec![UpdateChunkEvent(chunk_position)];
+
+    for i in 0..=2 {
+        if block_position[i] == 0 {
+            let mut adjacent_chunk_position = chunk_position;
+            adjacent_chunk_position[i] -= 1;
+            events.push(UpdateChunkEvent(adjacent_chunk_position))
+        }
+        else if block_position[i] == CHUNK_SIZE - 1 {
+            let mut adjacent_chunk_position = chunk_position;
+            adjacent_chunk_position[i] += 1;
+            events.push(UpdateChunkEvent(adjacent_chunk_position))
+        }
+    }
+
+    events
 }
 
 
