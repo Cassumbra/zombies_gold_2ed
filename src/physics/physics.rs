@@ -42,7 +42,7 @@ pub fn do_physics (
             let mut surface_contacts = SurfaceContacts(HashSet::new());
             // Air slip
             //let mut applied_slip = Vec3::new(0.975, 0.99, 0.975);
-            let mut applied_slip = Vec3::new(0.92, 1.0, 0.92);
+            let mut applied_slip = Vec3::new(0.05, 1.0, 0.05);
 
             for _ in 0..step_count {
                 let frame_velocity = **velocity * time.delta_seconds();
@@ -88,7 +88,7 @@ pub fn do_physics (
                 collisions.sort_unstable_by(|collision_a, collision_b| collision_b.penetration.partial_cmp(&collision_a.penetration).unwrap());
 
                 let mut collisions_new = Vec::<BlockCollision>::new();
-                if in_water {applied_slip = Vec3::new(0.89, 0.75, 0.89)};
+                if in_water {applied_slip = Vec3::new(0.005, 0.0025, 0.005)};
 
                 for (i, collision) in collisions.iter().enumerate() {
                     let (penetration, normal) = if i != 0 {collider.get_penetration_and_normal(transform.translation, BLOCK_AABB, collision.position.as_vec3())} else {(collision.penetration, collision.normal)};
@@ -170,10 +170,12 @@ pub fn do_physics (
     }
 }
 
-pub fn apply_friction(mut query: Query<(&AppliedSlip, &mut LinearVelocity)>) {
+pub fn apply_friction(
+    mut query: Query<(&AppliedSlip, &mut LinearVelocity)>,
+    time: Res<Time>,
+) {
     for (applied_slip, mut linear_velocity) in &mut query {
-        //println!("slip: {}", **applied_slip);
-        **linear_velocity *= **applied_slip;
+        **linear_velocity *= applied_slip.powf(time.delta_seconds());
     }
 }
 
@@ -279,7 +281,7 @@ impl BlockCollision {
 pub struct Slip(Vec3);
 impl Default for Slip {
     fn default() -> Self {
-        Self(Vec3::new(0.92, 1.0, 0.92))
+        Self(Vec3::new(0.015, 1.0, 0.015))
     }
 }
 
