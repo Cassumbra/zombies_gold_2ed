@@ -65,13 +65,15 @@ pub fn generate_chunks (
 
     let mut chunks_to_load = Vec::new();
 
+    **loading_queue = VecDeque::from_iter(loading_queue.iter().filter_map(|ev| if !chunk_map.contains_key(&ev.chunk) {Some(*ev)} else {None}));
+
     for ev in evr_load_chunk.read() {
         // Ignore chunks that are out of generation scope.
         if !((-WORLD_SIZE[0]..=WORLD_SIZE[0]).contains(&ev.chunk.x) && (-WORLD_SIZE[1]..=WORLD_SIZE[1]).contains(&ev.chunk.z) && (-WORLD_DEPTH..=WORLD_HEIGHT).contains(&ev.chunk.y)) {
             continue
         }
 
-        // Check if there's already an entity here.
+        // Check if there's already a chunk here.
         if chunk_map.contains_key(&ev.chunk) {
             continue
         }
@@ -145,6 +147,15 @@ pub fn generate_chunks (
             }
         }
         
+        if let Some(chunk) = chunk_map.get(&ev.chunk) {
+            if let Some(render_entity) = chunk.render_entity {
+                commands.entity(render_entity).despawn();
+            }
+            if let Some(water_render_entity) = chunk.water_render_entity {
+                commands.entity(water_render_entity).despawn();
+            }
+        }
+
         chunk_map.insert(ev.chunk, chunk);
         let loader_entity = match ev.load_reason {
             LoadReason::Loader(entity) => entity,
