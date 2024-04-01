@@ -100,7 +100,7 @@ pub fn mining (
                         if let Some(chunk) = chunk_map.get(&chunk_pos) {
                             let block_pos = block_pos_from_global(hit.position.as_ivec3());
 
-                            if chunk.blocks[block_pos].id != BlockID::Air {
+                            if chunk.blocks[block_pos].id != BlockID::Air && chunk.blocks[block_pos].id != BlockID::Water {
                                 evw_damage_block.send(DamageBlockEvent { position: hit.position.as_ivec3(), damage: 1, strength: 1, entity });
                                 break;
                             }
@@ -199,7 +199,7 @@ pub fn building (
                         if let Some(chunk) = chunk_map.get(&chunk_pos) {
                             let block_pos = block_pos_from_global(hit.position.as_ivec3());
 
-                            if chunk.blocks[block_pos].id != BlockID::Air {
+                            if chunk.blocks[block_pos].id != BlockID::Air && chunk.blocks[block_pos].id != BlockID::Water {
                                 evw_put_block.send(PutBlockEvent { position: hit.position.as_ivec3() + hit.normal.as_ivec3(), id: BlockID::StoneBrick, entity } );
                                 break;
                             }
@@ -238,7 +238,7 @@ pub fn place_block (
         if let Some(chunk) = chunk_map.get_mut(&chunk_pos) {
             let block_pos = block_pos_from_global(ev.position);
                 
-            if chunk.blocks[block_pos].id == BlockID::Air {
+            if chunk.blocks[block_pos].id == BlockID::Air || chunk.blocks[block_pos].id == BlockID::Water {
                 if let Ok(mut inventory) = inventory_query.get_mut(ev.entity) {
                     let attributes = ev.id.get_attributes();
 
