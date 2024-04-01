@@ -3,11 +3,6 @@
     // for the documentation about the tasks.json format
     "version": "2.0.0",
     "tasks": [
-    /*    {
-            "label": "build",
-            "type": "shell",
-            "command": "./tweego -l -o export/index.html src"
-        },*/
         {
             "label": "run",
             "type": "cargo",
@@ -19,19 +14,16 @@
                 "isDefault": true
             }
         },
-    /*    {
-            "label": "test",
-            "type": "shell",
-            "command": "tweego -l -o export/index.html --start=\"${input:start}\" src ; ./export/index.html",
-            "problemMatcher": [],
-        }*/
-    ],
-    /*"inputs": [
         {
-            "id": "start",
-            "description": "Start:",
-            "default": "Foreword",
-            "type": "promptString"
+            "label": "tracy",
+            "type": "cargo",
+            "command": "run",
+            "args":["--features=bevy/dynamic_linking,bevy/trace_tracy,console,"],
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
         },
-    ]*/
+    ],
 }

@@ -11,6 +11,7 @@
 use bevy::{app::AppExit, ecs::schedule::ScheduleLabel, pbr::wireframe::WireframePlugin, prelude::*, render::texture::{ImageFilterMode, ImageSampler, ImageSamplerDescriptor}};
 use bevy_asset_loader::prelude::*;
 use fastrand::Rng;
+use iyes_perf_ui::PerfUiPlugin;
 //use bevy_flycam::PlayerPlugin;
 use leafwing_input_manager::prelude::*;
 use moonshine_save::{save::SavePlugin, load::LoadPlugin};
@@ -140,6 +141,12 @@ fn main () {
                 .continue_to_state(GameState::Playing)
                 .load_collection::<Atlas>(),
         )
+
+    .add_plugins(bevy::diagnostic::FrameTimeDiagnosticsPlugin)
+    .add_plugins(bevy::diagnostic::EntityCountDiagnosticsPlugin)
+    .add_plugins(bevy::diagnostic::SystemInformationDiagnosticsPlugin)
+    
+    .add_plugins(PerfUiPlugin)
     /*
     .add_plugins(DefaultPlugins.set(RenderPlugin {
         render_creation: RenderCreation::Automatic(WgpuSettings {

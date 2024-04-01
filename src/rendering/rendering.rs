@@ -213,14 +213,19 @@ pub fn update_chunk_meshes (
              */
         });
         */
-        commands.entity(chunk_map[&**ev].render_entity.unwrap())
-            .try_insert(mesh_handle)
-            .try_insert(materials.add(material))
-            .try_insert(Visibility::default())
-            .try_insert(InheritedVisibility::default())
-            .try_insert(ViewVisibility::default())
-            // TODO: This is a bandaid fix. Bevy isn't frustum culling correctly and we should properly fix it instead of just disabling it. Oh well.
-            .try_insert(NoFrustumCulling);
+
+        if render_mesh.count_vertices() != 0 {
+            commands.entity(chunk_map[&**ev].render_entity.unwrap())
+                .try_insert(mesh_handle)
+                .try_insert(materials.add(material))
+                .try_insert(Visibility::default())
+                .try_insert(InheritedVisibility::default())
+                .try_insert(ViewVisibility::default())
+                // TODO: This is a bandaid fix. Bevy isn't frustum culling correctly and we should properly fix it instead of just disabling it. Oh well.
+                .try_insert(NoFrustumCulling);
+        }
+
+
 
 
 
@@ -303,13 +308,15 @@ pub fn update_chunk_meshes (
         material.alpha_mode = AlphaMode::Blend;
         material.base_color_texture = Some(atlas.res_8x8.clone());
 
-        commands.entity(chunk_map[&**ev].water_render_entity.unwrap())
-            .try_insert(mesh_handle)
-            .try_insert(materials.add(material))
-            .try_insert(Visibility::default())
-            .try_insert(InheritedVisibility::default())
-            .try_insert(ViewVisibility::default())
-            // TODO: This is a bandaid fix. Bevy isn't frustum culling correctly and we should properly fix it instead of just disabling it. Oh well.
-            .try_insert(NoFrustumCulling);
+        if render_mesh.count_vertices() != 0 {
+            commands.entity(chunk_map[&**ev].water_render_entity.unwrap())
+                .try_insert(mesh_handle)
+                .try_insert(materials.add(material))
+                .try_insert(Visibility::default())
+                .try_insert(InheritedVisibility::default())
+                .try_insert(ViewVisibility::default())
+                // TODO: This is a bandaid fix. Bevy isn't frustum culling correctly and we should properly fix it instead of just disabling it. Oh well.
+                .try_insert(NoFrustumCulling);
+        }
     }
 }

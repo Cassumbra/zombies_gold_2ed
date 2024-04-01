@@ -1,4 +1,5 @@
 use bevy::{a11y::AccessibilityNode, prelude::*};
+use iyes_perf_ui::PerfUiCompleteBundle;
 
 use crate::{Atlas, BuildingEvent, BuildingTimer, Inventory, ItemID, MiningEvent, MiningTimer, Player};
 
@@ -6,6 +7,8 @@ pub fn setup_ui (
     mut commands: Commands,
     //asset_server: Res<AssetServer>,
 ) {
+    commands.spawn(PerfUiCompleteBundle::default());
+
     commands.spawn(NodeBundle {
         style: Style {
             flex_direction: FlexDirection::Column,
