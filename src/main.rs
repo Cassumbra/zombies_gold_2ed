@@ -360,7 +360,7 @@ pub fn setup(
         //Transform::default(),
         //GlobalTransform::default(),
         ChunkPosition::default(),
-        ChunkLoader { range: 7, load_list: vec![] },
+        ChunkLoader { range: 15, load_list: vec![] },
         MiningTimer::default(),
         BuildingTimer::default(),
         Inventory::default(),
