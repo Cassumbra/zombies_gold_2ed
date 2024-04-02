@@ -271,17 +271,6 @@ pub fn update_chunk_meshes (
                 &faces,
                 &mut buffer,
             );
-    
-            //println!("unitquadbuffer: {:?}", buffer.groups.clone());
-    
-            /*
-            let num_indices = buffer.num_quads() * 6 * 2;
-            let num_vertices = buffer.num_quads() * 4 * 2;
-            let mut indices = Vec::with_capacity(num_indices * 2);
-            let mut positions = Vec::with_capacity(num_vertices * 2);
-            let mut normals = Vec::with_capacity(num_vertices * 2);
-            let mut uvs = Vec::with_capacity(num_vertices * 2);
-            */
 
             let num_indices = buffer.num_quads() * 6;
             let num_vertices = buffer.num_quads() * 4;
@@ -318,39 +307,6 @@ pub fn update_chunk_meshes (
                     });
     
                     uvs.extend_from_slice(&quad_uvs);
-
-                    /*
-                    let mut block_indices = face.quad_mesh_indices(positions.len() as u32);
-                    block_indices.reverse();
-
-                    indices.extend_from_slice(&block_indices);
-                    positions.extend_from_slice(&face.quad_mesh_positions(&quad.into(), 1.0));
-                    normals.extend_from_slice(&face.quad_mesh_normals().map(|[x, y, z]| [-x, -y, -z]));
-    
-                    let block = chunk_map[&**ev].blocks[UVec3::from(quad.minimum) - UVec3::new(1, 1, 1)];
-                    let attributes = block.get_attributes();
-                    let normal = face.signed_normal();
-    
-                    let mut tex_coord = if normal.x == 1 {attributes.tex_coords.east}
-                                 else if normal.x == -1 {attributes.tex_coords.west}
-                                 else if normal.y == 1 {attributes.tex_coords.top}
-                                 else if normal.y == -1 {attributes.tex_coords.bottom}
-                                 else if normal.z == 1 {attributes.tex_coords.north}
-                                 else {attributes.tex_coords.south};
-    
-                    if normal.y != 1 {tex_coord.x += 1};
-    
-                    
-                    let quad_uvs = face.tex_coords(RIGHT_HANDED_Y_UP_CONFIG.u_flip_face, true, &UnorientedQuad::from(quad)).map(|uv| {
-                        let mut u = uv[0] * 8.0;
-                        let mut v = uv[1] * 8.0;
-                        u += tex_coord.x as f32 * 8.0;
-                        v += tex_coord.y as f32 * 8.0;
-                        [u/256.0, v/256.0]
-                    });
-    
-                    uvs.extend_from_slice(&quad_uvs);
-                     */
                 }
             }
     

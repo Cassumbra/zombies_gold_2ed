@@ -135,6 +135,7 @@ fn main () {
     )
     .add_plugins(WireframePlugin)
     .insert_resource(Msaa::Off)
+    .insert_resource(ClearColor(Color::Rgba { red: 129.0/256.0, green: 194.0/256.0, blue: 247.0/256.0, alpha: 1.0 }))
 
     .init_state::<GameState>()
         .add_loading_state(
