@@ -323,6 +323,7 @@ pub fn setup(
         transform: Transform::from_xyz(0.0, (PLAYER_HEIGHT * 0.9) / 2.0, 0.0),
         ..default()
     })
+    .insert(PerspectiveProjection::default())
     .id();
 
     // Player

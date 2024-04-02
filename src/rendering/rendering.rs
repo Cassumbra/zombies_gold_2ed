@@ -367,19 +367,21 @@ pub fn update_water_material (
     mut material_assets: ResMut<Assets<StandardMaterial>>,
     chunk_map: Res<ChunkMap>,
 
-    camera_query: Query<(&GlobalTransform), (With<Camera>)>, //, Changed<GlobalTransform>
+    camera_query: Query<(&GlobalTransform, &Camera, &PerspectiveProjection)>, //, Changed<GlobalTransform>
 ) {
-    if let Ok(transform) = camera_query.get_single() {
+    if let Ok((transform, camera, perspective_projection)) = camera_query.get_single() {
+        //let near_plane = Transform::
+        let near_plane = transform.translation() + (transform.forward().normalize() * perspective_projection.near);
         // TODO: We can probably figure out a way to check the specific block we need to instead of iterating over a 3x3 section of blocks, but who cares.
-        for (x, y, z) in iproduct!((transform.translation().x - 1.0) as i32..=(transform.translation().x + 1.0) as i32, 
-                                   (transform.translation().y - 1.0) as i32..=(transform.translation().y + 1.0) as i32,
-                                   (transform.translation().z - 1.0) as i32..=(transform.translation().z + 1.0) as i32) {
+        for (x, y, z) in iproduct!((near_plane.x - 1.0) as i32..=(near_plane.x + 1.0) as i32, 
+                                   (near_plane.y - 1.0) as i32..=(near_plane.y + 1.0) as i32,
+                                   (near_plane.z - 1.0) as i32..=(near_plane.z + 1.0) as i32) {
             let global_block_position = IVec3::new(x, y, z);
             let chunk_position = chunk_pos_from_global(global_block_position);
             let block_position = block_pos_from_global(global_block_position);
 
             if let Some(chunk) = chunk_map.get(&chunk_position) {
-                if chunk.blocks[block_position].id == BlockID::Water && BLOCK_AABB.get_point_intersection(global_block_position.as_vec3(), transform.translation()) {
+                if chunk.blocks[block_position].id == BlockID::Water && BLOCK_AABB.get_point_intersection(global_block_position.as_vec3(), near_plane) {
                     if let Some(water_res_8x8) = material_assets.get_mut(&materials.water_res_8x8) {
                         water_res_8x8.cull_mode = Some(Face::Front);
                         return
