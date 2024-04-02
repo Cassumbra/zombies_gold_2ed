@@ -3,7 +3,7 @@ use itertools::{iproduct, izip};
 
 use crate::{block_pos_from_global, chunk_pos_from_global, BlockID, Chunk, ChunkMap, Solidity};
 
-const BLOCK_AABB: AabbCollider = AabbCollider{ width: 1.0, height: 1.0, length: 1.0 };
+pub const BLOCK_AABB: AabbCollider = AabbCollider{ width: 1.0, height: 1.0, length: 1.0 };
 
 pub fn apply_gravity (
     //mut commands: Commands,
@@ -305,6 +305,18 @@ pub struct AabbCollider {
 impl AabbCollider {
     pub fn new(width: f32, height: f32, length: f32) -> AabbCollider {
         AabbCollider { width, height, length }
+    }
+
+    pub fn get_point_intersection(&self, position: Vec3, point: Vec3) -> bool {
+        let self_min = position - Vec3::new(self.width, self.height, self.length) / 2.0;
+        let self_max = position + Vec3::new(self.width, self.height, self.length) / 2.0;
+
+        self_min.x <= point.x &&
+        self_max.x >= point.x &&
+        self_min.y <= point.y &&
+        self_max.y >= point.y &&
+        self_min.z <= point.z &&
+        self_max.z >= point.z
     }
 
     pub fn get_intersection(&self, position: Vec3, other_aabb: AabbCollider, other_position: Vec3) -> bool {

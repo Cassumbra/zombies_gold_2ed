@@ -8,7 +8,7 @@ use bevy::render::view::NoFrustumCulling;
 use bevy_asset_loader::prelude::*;
 use itertools::iproduct;
 
-use crate::{block_pos_from_global, chunk_pos_from_global, ChunkMap, UpdateChunkEvent, CHUNK_SIZE};
+use crate::{block_pos_from_global, chunk_pos_from_global, BlockID, ChunkMap, UpdateChunkEvent, BLOCK_AABB, CHUNK_SIZE};
 
 use block_mesh::ndshape::{ConstShape, ConstShape3u32};
 use block_mesh::{greedy_quads, visible_block_faces, GreedyQuadsBuffer, MergeVoxel, UnitQuadBuffer, UnorientedQuad, Voxel, VoxelVisibility, RIGHT_HANDED_Y_UP_CONFIG};
@@ -403,6 +403,37 @@ pub fn modify_materials (
         water_res_8x8.alpha_mode = AlphaMode::Blend;
         water_res_8x8.cull_mode = Some(Face::Back);
         water_res_8x8.double_sided = true;
+    }
+}
+
+pub fn update_water_material (
+    materials: Res<Materials>,
+    mut material_assets: ResMut<Assets<StandardMaterial>>,
+    chunk_map: Res<ChunkMap>,
+
+    camera_query: Query<(&GlobalTransform), (With<Camera>)>, //, Changed<GlobalTransform>
+) {
+    if let Ok(transform) = camera_query.get_single() {
+        // TODO: We can probably figure out a way to check the specific block we need to instead of iterating over a 3x3 section of blocks, but who cares.
+        for (x, y, z) in iproduct!((transform.translation().x - 1.0) as i32..=(transform.translation().x + 1.0) as i32, 
+                                   (transform.translation().y - 1.0) as i32..=(transform.translation().y + 1.0) as i32,
+                                   (transform.translation().z - 1.0) as i32..=(transform.translation().z + 1.0) as i32) {
+            let global_block_position = IVec3::new(x, y, z);
+            let chunk_position = chunk_pos_from_global(global_block_position);
+            let block_position = block_pos_from_global(global_block_position);
+
+            if let Some(chunk) = chunk_map.get(&chunk_position) {
+                if chunk.blocks[block_position].id == BlockID::Water && BLOCK_AABB.get_point_intersection(global_block_position.as_vec3(), transform.translation()) {
+                    if let Some(water_res_8x8) = material_assets.get_mut(&materials.water_res_8x8) {
+                        water_res_8x8.cull_mode = Some(Face::Front);
+                        return
+                    }
+                }
+            }
+        }
+        if let Some(water_res_8x8) = material_assets.get_mut(&materials.water_res_8x8) {
+            water_res_8x8.cull_mode = Some(Face::Back);
+        }
     }
 }
 

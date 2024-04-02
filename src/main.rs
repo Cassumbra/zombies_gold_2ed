@@ -8,7 +8,8 @@
 
 #![feature(const_fn_floating_point_arithmetic)]
 
-use bevy::{app::AppExit, ecs::schedule::ScheduleLabel, pbr::wireframe::WireframePlugin, prelude::*, render::texture::{ImageFilterMode, ImageSampler, ImageSamplerDescriptor}};
+use bevy::{app::AppExit, ecs::schedule::ScheduleLabel, pbr::wireframe::WireframePlugin, prelude::*, render::{texture::{ImageFilterMode, ImageSampler, ImageSamplerDescriptor}, Render, RenderSet}};
+use bevy::transform::TransformSystem::TransformPropagate;
 use bevy_asset_loader::prelude::*;
 use fastrand::Rng;
 use iyes_perf_ui::PerfUiPlugin;
@@ -176,6 +177,7 @@ fn main () {
     .add_systems(Startup, setup_ui)
 
     .add_systems(OnEnter(GameState::Playing), modify_materials)
+    .add_systems(PostUpdate, update_water_material.run_if(in_state(GameState::Playing)).after(TransformPropagate).before(RenderSet::PrepareAssets))
 
     .add_systems(Update, map::update_chunk_positions)
     .add_systems(Update, map::update_chunk_loaders)

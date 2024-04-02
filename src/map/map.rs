@@ -511,7 +511,7 @@ impl BlockID {
             // Logs will have special behavior for how they get mined, most likely. (Treefelling)
             BlockID::Log => BlockAttributes { health: 2, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 4)), give_on_damage: Some(Item{id: ItemID::Wood, amount: 32}), ..default() },
             BlockID::Leaves => BlockAttributes { health: 1, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 5)), solidity: Solidity::NonSolid, ..default() },
-            BlockID::Water => BlockAttributes {health: 0, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 7)), solidity: Solidity::Water, ..default()}
+            BlockID::Water => BlockAttributes {health: 0, tex_coords: TextureCoords::unique_top(IVec2::new(0, 7), IVec2::new(1, 7)), solidity: Solidity::Water, ..default()}
             
         }
     }
@@ -570,6 +570,9 @@ impl TextureCoords {
     }
     pub fn asymmetric_y(top: IVec2, bottom: IVec2, sides: IVec2) -> TextureCoords {
         TextureCoords { top, bottom, north: sides, south: sides, east: sides, west: sides }
+    }
+    pub fn unique_top(top: IVec2, sides: IVec2) -> TextureCoords {
+        TextureCoords { top, bottom: sides, north: sides, south: sides, east: sides, west: sides }
     }
 }
 
