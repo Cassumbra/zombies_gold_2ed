@@ -139,7 +139,8 @@ fn main () {
         .add_loading_state(
             LoadingState::new(GameState::AssetLoading)
                 .continue_to_state(GameState::Playing)
-                .load_collection::<Atlas>(),
+                .load_collection::<Atlas>()
+                .load_collection::<Materials>(),
         )
 
     .add_plugins(bevy::diagnostic::FrameTimeDiagnosticsPlugin)
@@ -173,6 +174,8 @@ fn main () {
     
     .add_systems(Startup, setup)
     .add_systems(Startup, setup_ui)
+
+    .add_systems(OnEnter(GameState::Playing), modify_materials)
 
     .add_systems(Update, map::update_chunk_positions)
     .add_systems(Update, map::update_chunk_loaders)
@@ -258,20 +261,7 @@ pub fn move_to_spawn (
     }
 }
 
-//let mut material = StandardMaterial::from(Color::WHITE);
-//material.unlit = true;
-//material.base_color_texture = Some(atlas.res_8x8.clone());
 
-#[derive(AssetCollection, Resource)]
-struct Atlas{
-    #[asset(path = "textures_8x8.png")]
-    pub res_8x8: Handle<Image>,
-
-    #[asset(texture_atlas_layout(tile_size_x = 8., tile_size_y = 8., columns = 32, rows = 32, padding_x = 0., padding_y = 0., offset_x = 0., offset_y = 0.))]
-    pub items_8x8_layout: Handle<TextureAtlasLayout>,
-    #[asset(path = "items_8x8.png")]
-    pub items_8x8: Handle<Image>,
-}
 
 
 #[derive(Clone, Copy, Resource, Deref, DerefMut, Reflect)]
@@ -360,7 +350,7 @@ pub fn setup(
         //Transform::default(),
         //GlobalTransform::default(),
         ChunkPosition::default(),
-        ChunkLoader { range: 15, load_list: vec![] },
+        ChunkLoader { range: 5, load_list: vec![] },
         MiningTimer::default(),
         BuildingTimer::default(),
         Inventory::default(),

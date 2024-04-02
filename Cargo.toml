@@ -10,7 +10,7 @@ edition = "2021"
 bevy = "0.13.1"
 moonshine-save = "0.3.5"
 leafwing-input-manager = "0.13"
-bevy_asset_loader = {version = "0.20.0", features = ["2d"]}
+bevy_asset_loader = {version = "0.20.0", features = ["2d", "3d"]}
 iyes_perf_ui = "0.2.3"
 # Other
 #sark_grids = {path = "../!_Local-Plugins/sark_grids_rs"} #"0.5.8"

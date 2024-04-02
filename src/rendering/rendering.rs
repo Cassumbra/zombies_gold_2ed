@@ -3,10 +3,12 @@ use std::mem::size_of;
 use bevy::prelude::*;
 use bevy::render::mesh::{Indices, MeshVertexAttribute, PrimitiveTopology, VertexAttributeValues};
 use bevy::render::render_asset::RenderAssetUsages;
+use bevy::render::render_resource::Face;
 use bevy::render::view::NoFrustumCulling;
+use bevy_asset_loader::prelude::*;
 use itertools::iproduct;
 
-use crate::{block_pos_from_global, chunk_pos_from_global, Atlas, Chunk, ChunkMap, TextureAtlas, UpdateChunkEvent, CHUNK_SIZE};
+use crate::{block_pos_from_global, chunk_pos_from_global, ChunkMap, UpdateChunkEvent, CHUNK_SIZE};
 
 use block_mesh::ndshape::{ConstShape, ConstShape3u32};
 use block_mesh::{greedy_quads, visible_block_faces, GreedyQuadsBuffer, MergeVoxel, UnitQuadBuffer, UnorientedQuad, Voxel, VoxelVisibility, RIGHT_HANDED_Y_UP_CONFIG};
@@ -36,6 +38,22 @@ type ChunkShape = ConstShape3u32<18, 18, 18>;
 
 
 
+//Plugin
+/*
+#[derive(Default)]
+pub struct RenderingPlugin;
+
+impl Plugin for RenderingPlugin {
+    fn build(&self, app: &mut App) {
+        app
+            .init_resource::<Materials>()
+            .init_resource::<Atlas>();
+    }
+}
+ */
+
+
+
 // systems
 pub fn update_chunk_meshes (
     mut commands: Commands,
@@ -43,7 +61,8 @@ pub fn update_chunk_meshes (
     mut evr_update_chunk: EventReader<UpdateChunkEvent>,
 
     atlas: Res<Atlas>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    materials: Res<Materials>,
+    mut materials_assets: ResMut<Assets<StandardMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut chunk_map: ResMut<ChunkMap>,
 ) {
@@ -213,12 +232,6 @@ pub fn update_chunk_meshes (
     
             let mesh_handle = meshes.add(render_mesh.clone());
     
-            // TODO: Should we be reusing this material instead of remaking it every time?
-            let mut material = StandardMaterial::from(Color::WHITE);
-            material.unlit = true;
-            material.alpha_mode = AlphaMode::Mask(0.0);
-            material.base_color_texture = Some(atlas.res_8x8.clone());
-    
             // TODO: Use insert_unique to insert a PbrBundle once insert_unique is available.
             /*
             commands.entity(entity).insert(PbrBundle{
@@ -239,7 +252,7 @@ pub fn update_chunk_meshes (
             if render_mesh.count_vertices() != 0 {
                 commands.entity(chunk_map[&**ev].render_entity.unwrap())
                     .try_insert(mesh_handle)
-                    .try_insert(materials.add(material))
+                    .try_insert(materials.world_res_8x8.clone())
                     .try_insert(Visibility::default())
                     .try_insert(InheritedVisibility::default())
                     .try_insert(ViewVisibility::default())
@@ -261,6 +274,15 @@ pub fn update_chunk_meshes (
     
             //println!("unitquadbuffer: {:?}", buffer.groups.clone());
     
+            /*
+            let num_indices = buffer.num_quads() * 6 * 2;
+            let num_vertices = buffer.num_quads() * 4 * 2;
+            let mut indices = Vec::with_capacity(num_indices * 2);
+            let mut positions = Vec::with_capacity(num_vertices * 2);
+            let mut normals = Vec::with_capacity(num_vertices * 2);
+            let mut uvs = Vec::with_capacity(num_vertices * 2);
+            */
+
             let num_indices = buffer.num_quads() * 6;
             let num_vertices = buffer.num_quads() * 4;
             let mut indices = Vec::with_capacity(num_indices);
@@ -296,6 +318,39 @@ pub fn update_chunk_meshes (
                     });
     
                     uvs.extend_from_slice(&quad_uvs);
+
+                    /*
+                    let mut block_indices = face.quad_mesh_indices(positions.len() as u32);
+                    block_indices.reverse();
+
+                    indices.extend_from_slice(&block_indices);
+                    positions.extend_from_slice(&face.quad_mesh_positions(&quad.into(), 1.0));
+                    normals.extend_from_slice(&face.quad_mesh_normals().map(|[x, y, z]| [-x, -y, -z]));
+    
+                    let block = chunk_map[&**ev].blocks[UVec3::from(quad.minimum) - UVec3::new(1, 1, 1)];
+                    let attributes = block.get_attributes();
+                    let normal = face.signed_normal();
+    
+                    let mut tex_coord = if normal.x == 1 {attributes.tex_coords.east}
+                                 else if normal.x == -1 {attributes.tex_coords.west}
+                                 else if normal.y == 1 {attributes.tex_coords.top}
+                                 else if normal.y == -1 {attributes.tex_coords.bottom}
+                                 else if normal.z == 1 {attributes.tex_coords.north}
+                                 else {attributes.tex_coords.south};
+    
+                    if normal.y != 1 {tex_coord.x += 1};
+    
+                    
+                    let quad_uvs = face.tex_coords(RIGHT_HANDED_Y_UP_CONFIG.u_flip_face, true, &UnorientedQuad::from(quad)).map(|uv| {
+                        let mut u = uv[0] * 8.0;
+                        let mut v = uv[1] * 8.0;
+                        u += tex_coord.x as f32 * 8.0;
+                        v += tex_coord.y as f32 * 8.0;
+                        [u/256.0, v/256.0]
+                    });
+    
+                    uvs.extend_from_slice(&quad_uvs);
+                     */
                 }
             }
     
@@ -319,17 +374,11 @@ pub fn update_chunk_meshes (
             render_mesh.translate_by(Vec3::new(-1.5, -1.5, -1.5));
     
             let mesh_handle = meshes.add(render_mesh.clone());
-    
-            // TODO: Should we be reusing this material instead of remaking it every time?
-            let mut material = StandardMaterial::from(Color::WHITE);
-            material.unlit = true;
-            material.alpha_mode = AlphaMode::Blend;
-            material.base_color_texture = Some(atlas.res_8x8.clone());
-    
+
             if render_mesh.count_vertices() != 0 {
                 commands.entity(chunk_map[&**ev].water_render_entity.unwrap())
                     .try_insert(mesh_handle)
-                    .try_insert(materials.add(material))
+                    .try_insert(materials.water_res_8x8.clone())
                     .try_insert(Visibility::default())
                     .try_insert(InheritedVisibility::default())
                     .try_insert(ViewVisibility::default())
@@ -337,7 +386,44 @@ pub fn update_chunk_meshes (
                     .try_insert(NoFrustumCulling);
             }
         }
-
-
     }
+}
+
+pub fn modify_materials (
+    materials: Res<Materials>,
+    mut material_assets: ResMut<Assets<StandardMaterial>>,
+) {
+    if let Some(world_res_8x8) = material_assets.get_mut(&materials.world_res_8x8) {
+        world_res_8x8.unlit = true;
+        world_res_8x8.alpha_mode = AlphaMode::Mask(0.0);
+    }
+
+    if let Some(water_res_8x8) = material_assets.get_mut(&materials.water_res_8x8) {
+        water_res_8x8.unlit = true;
+        water_res_8x8.alpha_mode = AlphaMode::Blend;
+        water_res_8x8.cull_mode = Some(Face::Back);
+        water_res_8x8.double_sided = true;
+    }
+}
+
+#[derive(AssetCollection, Resource)]
+pub struct Atlas{
+    #[asset(path = "textures_8x8.png")]
+    pub res_8x8: Handle<Image>,
+
+    #[asset(texture_atlas_layout(tile_size_x = 8., tile_size_y = 8., columns = 32, rows = 32, padding_x = 0., padding_y = 0., offset_x = 0., offset_y = 0.))]
+    pub items_8x8_layout: Handle<TextureAtlasLayout>,
+    #[asset(path = "items_8x8.png")]
+    pub items_8x8: Handle<Image>,
+}
+
+#[derive(AssetCollection, Resource)]
+pub struct Materials{
+    #[asset(standard_material)]
+    #[asset(path = "textures_8x8.png")]
+    pub world_res_8x8: Handle<StandardMaterial>,
+    #[asset(standard_material)]
+    #[asset(path = "textures_8x8.png")]
+    pub water_res_8x8: Handle<StandardMaterial>,
+
 }
