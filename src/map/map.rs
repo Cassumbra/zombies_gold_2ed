@@ -1,5 +1,5 @@
 use std::{collections::VecDeque, ops::{Range, RangeBounds}};
-use bevy::{math::Vec3A, prelude::*, render, utils::{HashMap, HashSet}};
+use bevy::{math::Vec3A, prelude::*, render::{self, render_resource::ShaderType}, utils::{HashMap, HashSet}};
 use fastrand::{Rng, choice};
 use itertools::{iproduct, Itertools};
 //use grid_tree::OctreeU32;
@@ -377,25 +377,36 @@ pub fn update_chunk_loaders (
         let min_corner_buffered = min_corner - buffer_range;
         let max_corner_buffered = max_corner + buffer_range;
         //let y = 0;
-        for (x, y, z) in iproduct!(min_corner_buffered.x..=max_corner_buffered.x,
-                                   min_corner_buffered.y..=max_corner_buffered.y,
-                                   min_corner_buffered.z..=max_corner_buffered.z) {
+
+        let mut load_range = iproduct!(min_corner_buffered.x..=position.x,
+                                         min_corner_buffered.y..=max_corner_buffered.y,
+                                         min_corner_buffered.z..=max_corner_buffered.z).map(|(x, y, z)| IVec3::new(x, y, z)).collect_vec();
+
+        load_range.reverse();
+
+        let mut load_range_end = iproduct!((position.x + 1)..=max_corner_buffered.x,
+                                       min_corner_buffered.y..=max_corner_buffered.y,
+                                       min_corner_buffered.z..=max_corner_buffered.z).map(|(x, y, z)| IVec3::new(x, y, z)).collect_vec();
+
+        load_range.append(&mut load_range_end);
+
+        for p in load_range.iter() {
                                     
             let mut load_success = false;
 
-                if let Some(chunk) = chunk_map.get_mut(&IVec3::new(x, y, z)) {
+                if let Some(chunk) = chunk_map.get_mut(p) {
                     // Try to remove this. Just in case.
                     chunk.load_reasons.remove(&LoadReason::Spawning(entity));
 
                     chunk.load_reasons.insert(LoadReason::Loader(entity));
 
-                    loader.load_list.push(IVec3::new(x, y, z));
+                    loader.load_list.push(*p);
 
                     load_success = true;
                 }
             // We keep everything in the range and the buffer range loaded, but we only *start* loading if chunks are in the load range proper.
-            if !load_success && (min_corner.x..=max_corner.x).contains(&x) && (min_corner.y..=max_corner.y).contains(&y) && (min_corner.z..=max_corner.z).contains(&z) {
-                evw_load_chunk.send(LoadChunkEvent { chunk: IVec3::new(x, y, z), load_reason: LoadReason::Loader(entity) });
+            if !load_success && (min_corner.x..=max_corner.x).contains(&p.x) && (min_corner.y..=max_corner.y).contains(&p.y) && (min_corner.z..=max_corner.z).contains(&p.z) {
+                evw_load_chunk.send(LoadChunkEvent { chunk: *p, load_reason: LoadReason::Loader(entity) });
             }
         }
     }
