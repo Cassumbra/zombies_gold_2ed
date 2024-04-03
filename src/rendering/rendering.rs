@@ -1,6 +1,7 @@
 use std::mem::size_of;
 
 use bevy::prelude::*;
+use bevy::render::camera::CameraProjection;
 use bevy::render::mesh::{Indices, MeshVertexAttribute, PrimitiveTopology, VertexAttributeValues};
 use bevy::render::render_asset::RenderAssetUsages;
 use bevy::render::render_resource::Face;
@@ -367,21 +368,25 @@ pub fn update_water_material (
     mut material_assets: ResMut<Assets<StandardMaterial>>,
     chunk_map: Res<ChunkMap>,
 
-    camera_query: Query<(&GlobalTransform, &Camera, &PerspectiveProjection)>, //, Changed<GlobalTransform>
+    camera_query: Query<(&GlobalTransform, &Projection), (With<Camera>)>, //, Changed<GlobalTransform>
 ) {
-    if let Ok((transform, camera, perspective_projection)) = camera_query.get_single() {
-        //let near_plane = Transform::
-        let near_plane = transform.translation() + (transform.forward().normalize() * perspective_projection.near);
+    if let Ok((transform, projection)) = camera_query.get_single() {
+        //let near_plane = perspective_projection.compute_frustum(transform);
+        let near = match projection {
+            Projection::Perspective(perspective) => perspective.near,
+            Projection::Orthographic(orthographic) => orthographic.near,
+        };
+        let near_position = transform.translation() + (transform.forward().normalize() * near);
         // TODO: We can probably figure out a way to check the specific block we need to instead of iterating over a 3x3 section of blocks, but who cares.
-        for (x, y, z) in iproduct!((near_plane.x - 1.0) as i32..=(near_plane.x + 1.0) as i32, 
-                                   (near_plane.y - 1.0) as i32..=(near_plane.y + 1.0) as i32,
-                                   (near_plane.z - 1.0) as i32..=(near_plane.z + 1.0) as i32) {
+        for (x, y, z) in iproduct!((near_position.x - 1.0) as i32..=(near_position.x + 1.0) as i32, 
+                                   (near_position.y - 1.0) as i32..=(near_position.y + 1.0) as i32,
+                                   (near_position.z - 1.0) as i32..=(near_position.z + 1.0) as i32) {
             let global_block_position = IVec3::new(x, y, z);
             let chunk_position = chunk_pos_from_global(global_block_position);
             let block_position = block_pos_from_global(global_block_position);
 
             if let Some(chunk) = chunk_map.get(&chunk_position) {
-                if chunk.blocks[block_position].id == BlockID::Water && BLOCK_AABB.get_point_intersection(global_block_position.as_vec3(), near_plane) {
+                if chunk.blocks[block_position].id == BlockID::Water && BLOCK_AABB.get_point_intersection(global_block_position.as_vec3(), near_position) {
                     if let Some(water_res_8x8) = material_assets.get_mut(&materials.water_res_8x8) {
                         water_res_8x8.cull_mode = Some(Face::Front);
                         return

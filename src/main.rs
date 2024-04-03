@@ -8,6 +8,8 @@
 
 #![feature(const_fn_floating_point_arithmetic)]
 
+use std::f32::consts::PI;
+
 use bevy::{app::AppExit, ecs::schedule::ScheduleLabel, pbr::wireframe::WireframePlugin, prelude::*, render::{texture::{ImageFilterMode, ImageSampler, ImageSamplerDescriptor}, Render, RenderSet}};
 use bevy::transform::TransformSystem::TransformPropagate;
 use bevy_asset_loader::prelude::*;
@@ -318,12 +320,18 @@ pub fn setup(
     .insert(Collider::cuboid(1.0, 1.0, 1.0));
      */
     
+
     // Camera
     let camera = commands.spawn(Camera3dBundle {
         transform: Transform::from_xyz(0.0, (PLAYER_HEIGHT * 0.9) / 2.0, 0.0),
+        projection: Projection::Perspective(PerspectiveProjection {
+            fov: 60.0_f32.to_radians(),
+
+            ..default()
+        }),
+
         ..default()
     })
-    .insert(PerspectiveProjection::default())
     .id();
 
     // Player
