@@ -127,11 +127,11 @@ pub fn update_resource_counts (
                 //println!("coords: {}, index: {}", tex_coords, index);
 
                 let image_entity = commands.spawn(ImageBundle {
-                    //style: Style {
+                    style: Style {
                     //    width: Val::Px(256.),
                     //    height: Val::Px(256.),
-                    //    ..default()
-                    //},
+                        ..default()
+                    },
                     image: UiImage::new(atlas.items_8x8.clone()),
                     ..default()
                     },
