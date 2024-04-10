@@ -5,7 +5,8 @@ use bevy::render::camera::CameraProjection;
 use bevy::render::mesh::{Indices, MeshVertexAttribute, PrimitiveTopology, VertexAttributeValues};
 use bevy::render::render_asset::RenderAssetUsages;
 use bevy::render::render_resource::Face;
-use bevy::render::view::NoFrustumCulling;
+use bevy::render::view::{NoFrustumCulling, RenderLayers};
+use bevy::window::WindowResized;
 use bevy_asset_loader::prelude::*;
 use itertools::iproduct;
 
@@ -13,6 +14,66 @@ use crate::{block_pos_from_global, chunk_pos_from_global, BlockID, ChunkMap, Upd
 
 use block_mesh::ndshape::{ConstShape, ConstShape3u32};
 use block_mesh::{greedy_quads, visible_block_faces, GreedyQuadsBuffer, MergeVoxel, UnitQuadBuffer, UnorientedQuad, Voxel, VoxelVisibility, RIGHT_HANDED_Y_UP_CONFIG};
+
+
+
+
+
+//Plugin
+/*
+#[derive(Default)]
+pub struct RenderingPlugin;
+
+impl Plugin for RenderingPlugin {
+    fn build(&self, app: &mut App) {
+        app
+            .init_resource::<Materials>()
+            .init_resource::<Atlas>();
+    }
+}
+ */
+
+/// Default render layers for pixel-perfect rendering.
+/// You can skip adding this component, as this is the default.
+pub const PIXEL_PERFECT_LAYERS: RenderLayers = RenderLayers::layer(0);
+
+/// Render layers for high-resolution rendering.
+pub const HIGH_RES_LAYERS: RenderLayers = RenderLayers::layer(1);
+
+/// In-game resolution width.
+pub const RES_WIDTH: u32 = 256;
+
+/// In-game resolution height.
+pub const RES_HEIGHT: u32 = 192;
+
+/// Scales camera projection to fit the window (integer multiples only).
+pub fn fit_canvas(
+    mut resize_events: EventReader<WindowResized>,
+    mut projections: Query<&mut OrthographicProjection, With<OuterCamera>>,
+) {
+    for event in resize_events.read() {
+        let h_scale = event.width / RES_WIDTH as f32;
+        let v_scale = event.height / RES_HEIGHT as f32;
+        let mut projection = projections.single_mut();
+        projection.scale = 1. / h_scale.min(v_scale).round();
+    }
+}
+
+/// Low-resolution texture that contains the pixel-perfect world.
+/// Canvas itself is rendered to the high-resolution world.
+#[derive(Component)]
+pub struct Canvas;
+
+/// Camera that renders the pixel-perfect world to the [`Canvas`].
+#[derive(Component)]
+pub struct InGameCamera;
+
+/// Camera that renders the [`Canvas`] (and other graphics on [`HIGH_RES_LAYERS`]) to the screen.
+#[derive(Component)]
+pub struct OuterCamera;
+
+
+
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 struct VisVoxel(VoxelVisibility);
@@ -36,24 +97,6 @@ impl MergeVoxel for VisVoxel {
 }
 
 type ChunkShape = ConstShape3u32<18, 18, 18>;
-
-
-
-//Plugin
-/*
-#[derive(Default)]
-pub struct RenderingPlugin;
-
-impl Plugin for RenderingPlugin {
-    fn build(&self, app: &mut App) {
-        app
-            .init_resource::<Materials>()
-            .init_resource::<Atlas>();
-    }
-}
- */
-
-
 
 // systems
 pub fn update_chunk_meshes (
