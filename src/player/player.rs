@@ -15,6 +15,8 @@ use crate::{Action, BuildingEvent, MiningEvent, PLAYER_HEIGHT};
 
 //use crate::rendering::window::WindowChangeEvent;
 
+const SENSITIVITY: f32 = -0.00025;
+
 // Components
 #[derive(Component, Default, Copy, Clone, Reflect)]
 #[reflect(Component)]
@@ -92,12 +94,11 @@ pub fn player_input_game (
 
             if window.cursor.grab_mode == CursorGrabMode::Confined {
                 if let Some(look) = action_state.axis_pair(&Action::Look) {
-                    // TODO: The sensitivity shouldn't be a magic number.
-                    transform.rotate_y(look.x() *  -0.001);
+                    transform.rotate_y(look.x() * SENSITIVITY);
                     // TODO: Maybe we should have some camera component or something for this? Or some better way to link things?
                     for child in children.iter() {
                         if let Ok(mut child_transform) = cam_query.get_mut(*child) {
-                            let mut rotation_x = child_transform.rotation.to_euler(EulerRot::XYZ).0 + look.y() * -0.001;
+                            let mut rotation_x = child_transform.rotation.to_euler(EulerRot::XYZ).0 + look.y() * SENSITIVITY;
                             // Rotating the character is OK, since we don't base any collision info based on rotations.
                             rotation_x = rotation_x.clamp(-PI/2.0, PI/2.0);
                             child_transform.rotation = Quat::from_axis_angle(Vec3::X, rotation_x);
