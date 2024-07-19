@@ -167,6 +167,7 @@ fn main () {
                 .load_collection::<Atlas>()
                 .load_collection::<Materials>(),
         )
+    .init_asset::<BlockMaterial>()
 
     .add_plugins(bevy::diagnostic::FrameTimeDiagnosticsPlugin)
     .add_plugins(bevy::diagnostic::EntityCountDiagnosticsPlugin)

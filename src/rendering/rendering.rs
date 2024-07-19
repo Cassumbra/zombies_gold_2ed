@@ -1,10 +1,11 @@
 use std::mem::size_of;
 
-use bevy::prelude::*;
+use bevy::{
+    pbr::{ExtendedMaterial, MaterialExtension}, prelude::*, reflect::TypePath, render::render_resource::{AsBindGroup, Face, ShaderRef}
+};
 use bevy::render::camera::CameraProjection;
 use bevy::render::mesh::{Indices, MeshVertexAttribute, PrimitiveTopology, VertexAttributeValues};
 use bevy::render::render_asset::RenderAssetUsages;
-use bevy::render::render_resource::Face;
 use bevy::render::view::{NoFrustumCulling, RenderLayers};
 use bevy::window::WindowResized;
 use bevy_asset_loader::prelude::*;
@@ -391,24 +392,24 @@ pub fn update_chunk_meshes (
 
 pub fn modify_materials (
     materials: Res<Materials>,
-    mut material_assets: ResMut<Assets<StandardMaterial>>,
+    mut material_assets: ResMut<Assets<BlockMaterial>>,
 ) {
     if let Some(world_res_8x8) = material_assets.get_mut(&materials.world_res_8x8) {
-        world_res_8x8.unlit = true;
+        //world_res_8x8.unlit = true;
         world_res_8x8.alpha_mode = AlphaMode::Mask(0.0);
     }
 
     if let Some(water_res_8x8) = material_assets.get_mut(&materials.water_res_8x8) {
-        water_res_8x8.unlit = true;
+        //water_res_8x8.unlit = true;
         water_res_8x8.alpha_mode = AlphaMode::Blend;
-        water_res_8x8.cull_mode = Some(Face::Back);
-        water_res_8x8.double_sided = true;
+        //water_res_8x8.cull_mode = Some(Face::Back);
+        //water_res_8x8.double_sided = true;
     }
 }
 
 pub fn update_water_material (
     materials: Res<Materials>,
-    mut material_assets: ResMut<Assets<StandardMaterial>>,
+    mut material_assets: ResMut<Assets<BlockMaterial>>,
     chunk_map: Res<ChunkMap>,
 
     camera_query: Query<(&GlobalTransform, &Projection), (With<Camera>)>, //, Changed<GlobalTransform>
@@ -431,14 +432,16 @@ pub fn update_water_material (
             if let Some(chunk) = chunk_map.get(&chunk_position) {
                 if chunk.blocks[block_position].id == BlockID::Water && BLOCK_AABB.get_point_intersection(global_block_position.as_vec3(), near_position) {
                     if let Some(water_res_8x8) = material_assets.get_mut(&materials.water_res_8x8) {
-                        water_res_8x8.cull_mode = Some(Face::Front);
+                        // TODO!!!
+                        //water_res_8x8.cull_mode = Some(Face::Front);
                         return
                     }
                 }
             }
         }
         if let Some(water_res_8x8) = material_assets.get_mut(&materials.water_res_8x8) {
-            water_res_8x8.cull_mode = Some(Face::Back);
+            // TODO!!!
+            //water_res_8x8.cull_mode = Some(Face::Back);
         }
     }
 }
@@ -462,5 +465,49 @@ pub struct Materials{
     #[asset(standard_material)]
     #[asset(path = "textures_8x8.png")]
     pub water_res_8x8: Handle<StandardMaterial>,
-
 }
+
+#[derive(Asset, AsBindGroup, TypePath, Debug, Clone)]
+struct ChunkMaterial {
+    // Start at a high binding number to ensure bindings don't conflict
+    // with the base material
+    #[uniform(100)]
+    variation_grid: Box<[u32; CHUNK_SIZE.pow(3) as usize]>,
+}
+
+impl MaterialExtension for ChunkMaterial {
+    fn fragment_shader() -> ShaderRef {
+        "TODO.wgsl".into()
+    }
+}
+
+
+// This struct defines the data that will be passed to your shader
+#[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
+pub struct BlockMaterial {
+    #[uniform(0)]
+    color: Color,
+    #[texture(1)]
+    #[sampler(2)]
+    color_texture: Option<Handle<Image>>,
+    alpha_mode: AlphaMode,
+}
+
+/// The Material trait is very configurable, but comes with sensible defaults for all methods.
+/// You only need to implement functions for features that need non-default behavior. See the Material api docs for details!
+impl Material for BlockMaterial {
+    fn fragment_shader() -> ShaderRef {
+        "shaders/custom_material.wgsl".into()
+    }
+
+    fn alpha_mode(&self) -> AlphaMode {
+        self.alpha_mode
+    }
+}
+
+impl From<Handle<Image>> for BlockMaterial {
+    fn from(value: Handle<Image>) -> Self {
+        BlockMaterial {color: Color::WHITE, color_texture: Some(value), alpha_mode: AlphaMode::Opaque}
+    }
+}/*
+ */

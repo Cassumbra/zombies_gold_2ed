@@ -6,8 +6,8 @@
         {
             "label": "run",
             "type": "cargo",
-            "command": "run",
-            "args":["--features=bevy/dynamic_linking,console"],
+            "command": "cargo",
+            "args":["run", "--features=bevy/dynamic_linking,console"],
             "problemMatcher": [],
             "group": {
                 "kind": "build",
