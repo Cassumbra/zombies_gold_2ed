@@ -15,7 +15,7 @@ use crate::{Action, BuildingEvent, MiningEvent, PLAYER_HEIGHT};
 
 //use crate::rendering::window::WindowChangeEvent;
 
-const SENSITIVITY: f32 = -0.00025;
+const SENSITIVITY: f32 = -0.0004;
 
 // Components
 #[derive(Component, Default, Copy, Clone, Reflect)]

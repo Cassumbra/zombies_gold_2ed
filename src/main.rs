@@ -165,7 +165,7 @@ fn main () {
             LoadingState::new(GameState::AssetLoading)
                 .continue_to_state(GameState::Playing)
                 .load_collection::<Atlas>()
-                .load_collection::<Materials>(),
+                .init_resource::<Materials>()
         )
     .init_asset::<BlockMaterial>()
 
@@ -173,7 +173,7 @@ fn main () {
     .add_plugins(bevy::diagnostic::EntityCountDiagnosticsPlugin)
     .add_plugins(bevy::diagnostic::SystemInformationDiagnosticsPlugin)
     
-    .add_plugins(PerfUiPlugin)
+    //.add_plugins(PerfUiPlugin)
     /*
     .add_plugins(DefaultPlugins.set(RenderPlugin {
         render_creation: RenderCreation::Automatic(WgpuSettings {
@@ -194,6 +194,7 @@ fn main () {
 
     .add_plugins(ActionsPlugin)
     .add_plugins(MapPlugin)
+    //.add_plugins(RenderingPlugin)
 
     .init_resource::<RNGSeed>()
 

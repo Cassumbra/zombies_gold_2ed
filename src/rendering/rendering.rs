@@ -1,7 +1,7 @@
 use std::mem::size_of;
 
 use bevy::{
-    pbr::{ExtendedMaterial, MaterialExtension}, prelude::*, reflect::TypePath, render::render_resource::{AsBindGroup, Face, ShaderRef}
+    ecs::system::SystemState, pbr::{ExtendedMaterial, MaterialExtension}, prelude::*, reflect::TypePath, render::render_resource::{AsBindGroup, Face, ShaderRef}
 };
 use bevy::render::camera::CameraProjection;
 use bevy::render::mesh::{Indices, MeshVertexAttribute, PrimitiveTopology, VertexAttributeValues};
@@ -21,15 +21,13 @@ use block_mesh::{greedy_quads, visible_block_faces, GreedyQuadsBuffer, MergeVoxe
 
 
 //Plugin
-/*
 #[derive(Default)]
 pub struct RenderingPlugin;
-
+/*
 impl Plugin for RenderingPlugin {
     fn build(&self, app: &mut App) {
         app
-            .init_resource::<Materials>()
-            .init_resource::<Atlas>();
+            .init_resource::<Materials>();
     }
 }
  */
@@ -457,14 +455,21 @@ pub struct Atlas{
     pub items_8x8: Handle<Image>,
 }
 
-#[derive(AssetCollection, Resource)]
+#[derive(Resource)]
 pub struct Materials{
-    #[asset(standard_material)]
-    #[asset(path = "textures_8x8.png")]
-    pub world_res_8x8: Handle<StandardMaterial>,
-    #[asset(standard_material)]
-    #[asset(path = "textures_8x8.png")]
-    pub water_res_8x8: Handle<StandardMaterial>,
+    pub world_res_8x8: Handle<BlockMaterial>,
+    pub water_res_8x8: Handle<BlockMaterial>,
+}
+
+impl FromWorld for Materials {
+    fn from_world(world: &mut World) -> Self {
+        let mut system_state = SystemState::<(ResMut<Assets<BlockMaterial>>, Res<Atlas>)>::new(world);
+        let (mut materials, atlas) = system_state.get_mut(world);
+        Materials {
+            world_res_8x8: materials.add(BlockMaterial { color: Color::WHITE, color_texture: Some(atlas.items_8x8.clone()), alpha_mode: AlphaMode::Mask(0.0) }),
+            water_res_8x8: materials.add(BlockMaterial { color: Color::WHITE, color_texture: Some(atlas.items_8x8.clone()), alpha_mode: AlphaMode::Blend }),
+        }
+    }
 }
 
 #[derive(Asset, AsBindGroup, TypePath, Debug, Clone)]
