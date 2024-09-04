@@ -466,8 +466,8 @@ impl FromWorld for Materials {
         let mut system_state = SystemState::<(ResMut<Assets<BlockMaterial>>, Res<Atlas>)>::new(world);
         let (mut materials, atlas) = system_state.get_mut(world);
         Materials {
-            world_res_8x8: materials.add(BlockMaterial { color: Color::WHITE, color_texture: Some(atlas.items_8x8.clone()), alpha_mode: AlphaMode::Mask(0.0) }),
-            water_res_8x8: materials.add(BlockMaterial { color: Color::WHITE, color_texture: Some(atlas.items_8x8.clone()), alpha_mode: AlphaMode::Blend }),
+            world_res_8x8: materials.add(BlockMaterial { color: Color::WHITE, color_texture: Some(atlas.res_8x8.clone()), alpha_mode: AlphaMode::Mask(0.0) }),
+            water_res_8x8: materials.add(BlockMaterial { color: Color::WHITE, color_texture: Some(atlas.res_8x8.clone()), alpha_mode: AlphaMode::Blend }),
         }
     }
 }
@@ -514,5 +514,4 @@ impl From<Handle<Image>> for BlockMaterial {
     fn from(value: Handle<Image>) -> Self {
         BlockMaterial {color: Color::WHITE, color_texture: Some(value), alpha_mode: AlphaMode::Opaque}
     }
-}/*
- */
+}

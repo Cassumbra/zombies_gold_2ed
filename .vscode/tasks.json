@@ -6,14 +6,15 @@
         {
             "label": "run",
             "type": "cargo",
-            "command": "cargo",
-            "args":["run", "--features=bevy/dynamic_linking,console"],
+            "command": "run",
+            "args":["--features=bevy/dynamic_linking,console"],
             "problemMatcher": [],
             "group": {
                 "kind": "build",
                 "isDefault": true
             }
         },
+        /*
         {
             "label": "tracy",
             "type": "cargo",
@@ -25,5 +26,6 @@
                 "isDefault": true
             }
         },
+        */
     ],
 }

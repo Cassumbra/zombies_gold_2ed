@@ -168,7 +168,7 @@ fn main () {
                 .init_resource::<Materials>()
         )
     .init_asset::<BlockMaterial>()
-
+    .add_plugins(MaterialPlugin::<BlockMaterial>::default())
     .add_plugins(bevy::diagnostic::FrameTimeDiagnosticsPlugin)
     .add_plugins(bevy::diagnostic::EntityCountDiagnosticsPlugin)
     .add_plugins(bevy::diagnostic::SystemInformationDiagnosticsPlugin)
