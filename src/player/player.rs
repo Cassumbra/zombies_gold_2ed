@@ -90,7 +90,7 @@ pub fn player_input_game (
                 evw_building.send(BuildingEvent { entity: player, is_start: false });
             }
 
-            /*
+            
             if window.cursor.grab_mode == CursorGrabMode::Confined {
                 let look = action_state.axis_pair(&Action::Look);
                 transform.rotate_y(look.x * SENSITIVITY);
@@ -107,7 +107,6 @@ pub fn player_input_game (
                     }
                 }
             }
-             */
         }
         
         

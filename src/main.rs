@@ -302,15 +302,24 @@ impl Default for RNGSeed {
     }
 }
 
-#[derive(Actionlike, PartialEq, Eq, Clone, Copy, Hash, Debug, Reflect)]
+#[derive(PartialEq, Eq, Clone, Copy, Hash, Debug, Reflect)]
 enum Action {
     MoveForward, MoveBackward,
     MoveLeft, MoveRight,
     Crouch, Jump,
     //#[actionlike(DualAxis)]
-    //Look, 
+    Look, 
     Primary, Secondary,
     MenuBack,
+}
+
+impl Actionlike for Action {
+    fn input_control_kind (&self) -> InputControlKind {  use InputControlKind::*; use Action::*;
+        match self {
+            Look => DualAxis,
+            _ => Button,
+        }
+    }
 }
 
 /*
@@ -416,7 +425,7 @@ pub fn setup (
                                        //(Action::Look, DualAxis::mouse_motion()), (Action::Primary, InputKind::Mouse(MouseButton::Left)), (Action::Secondary, InputKind::Mouse(MouseButton::Right)),
                                        //(Action::MenuBack, InputKind::PhysicalKey(KeyCode::Escape)),
                         ]);
-    //input_map.insert_dual_axis(Action::Look, MouseMove::default());
+    input_map.insert_dual_axis(Action::Look, MouseMove::default());
     input_map.insert(Action::Primary, MouseButton::Left);
     input_map.insert(Action::Secondary, MouseButton::Right);
     input_map.insert(Action::MenuBack, KeyCode::Escape);
