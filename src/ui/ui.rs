@@ -1,5 +1,5 @@
 use bevy::{a11y::AccessibilityNode, prelude::*};
-use iyes_perf_ui::PerfUiCompleteBundle;
+use iyes_perf_ui::entries::PerfUiCompleteBundle;
 
 use crate::{Atlas, BuildingEvent, BuildingTimer, Inventory, ItemID, MiningEvent, MiningTimer, Player};
 
@@ -45,7 +45,7 @@ pub fn setup_ui (
                     // This font is loaded and will be used instead of the default font.
                     //font: asset_server.load("fonts/FiraSans-Bold.ttf"),
                     font_size: 100.0,
-                    color: Color::Rgba { red: 1.0, green: 1.0, blue: 1.0, alpha: 0.25 },
+                    color: Color::linear_rgba(1.0, 1.0, 1.0, 0.25),
                     ..default()
                 },
             ) // Set the justification of the Text
@@ -62,7 +62,7 @@ pub fn setup_ui (
                 height: Val::Px(10.0),
                 ..default()
             },
-            background_color: BackgroundColor(Color::Rgba { red: 0.9, green: 0.9, blue: 0.9, alpha: 0.25 },),
+            background_color: BackgroundColor(Color::linear_rgba(0.9, 0.9, 0.9, 0.25),),
             ..default()
         })
         .with_children(|parent| {
@@ -72,7 +72,7 @@ pub fn setup_ui (
                     height: Val::Percent(100.0),
                     ..default()
                 },
-                background_color: BackgroundColor(Color::Rgba { red: 1.0, green: 1.0, blue: 1.0, alpha: 0.50 },),
+                background_color: BackgroundColor(Color::linear_rgba(1.0, 1.0, 1.0, 0.50),),
                 ..default()
             })
             .insert(ProgressBar::None);

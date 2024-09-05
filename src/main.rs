@@ -18,6 +18,7 @@ use fastrand::Rng;
 use iyes_perf_ui::PerfUiPlugin;
 //use bevy_flycam::PlayerPlugin;
 use leafwing_input_manager::prelude::*;
+use leafwing_input_manager::Actionlike;
 use moonshine_save::{save::SavePlugin, load::LoadPlugin};
 use image::{imageops::FilterType};
 //use bevy::render::settings::WgpuSettings;
@@ -158,7 +159,7 @@ fn main () {
       */
     .add_plugins(WireframePlugin)
     .insert_resource(Msaa::Off)
-    .insert_resource(ClearColor(Color::Rgba { red: 129.0/256.0, green: 194.0/256.0, blue: 247.0/256.0, alpha: 1.0 }))
+    .insert_resource(ClearColor(Color::linear_rgba(129.0/256.0, 194.0/256.0, 247.0/256.0, 1.0 )))
 
     .init_state::<GameState>()
         .add_loading_state(
@@ -306,16 +307,20 @@ enum Action {
     MoveForward, MoveBackward,
     MoveLeft, MoveRight,
     Crouch, Jump,
-    Look, Primary, Secondary,
+    //#[actionlike(DualAxis)]
+    //Look, 
+    Primary, Secondary,
     MenuBack,
 }
 
+/*
 const INPUT_MAP: [(Action, InputKind); 10] = [(Action::MoveForward, InputKind::PhysicalKey(KeyCode::KeyW)), (Action::MoveBackward, InputKind::PhysicalKey(KeyCode::KeyS)),
                                             (Action::MoveLeft, InputKind::PhysicalKey(KeyCode::KeyA)), (Action::MoveRight, InputKind::PhysicalKey(KeyCode::KeyD)),
                                             (Action::Crouch, InputKind::PhysicalKey(KeyCode::ShiftLeft)), (Action::Jump, InputKind::PhysicalKey(KeyCode::Space)),
                                             (Action::Look, InputKind::DualAxis(DualAxis::mouse_motion())), (Action::Primary, InputKind::Mouse(MouseButton::Left)), (Action::Secondary, InputKind::Mouse(MouseButton::Right)),
                                             (Action::MenuBack, InputKind::PhysicalKey(KeyCode::Escape)),
                                           ];
+ */
 
 pub fn app_exit (mut events: EventReader<AppExit>) -> bool {
     !events.is_empty()
@@ -405,6 +410,17 @@ pub fn setup (
         HIGH_RES_LAYERS,
     ));
 
+    let mut input_map = InputMap::new([(Action::MoveForward, KeyCode::KeyW), (Action::MoveBackward, KeyCode::KeyS),
+                                       (Action::MoveLeft, KeyCode::KeyA), (Action::MoveRight, KeyCode::KeyD),
+                                       (Action::Crouch, KeyCode::ShiftLeft), (Action::Jump, KeyCode::Space),
+                                       //(Action::Look, DualAxis::mouse_motion()), (Action::Primary, InputKind::Mouse(MouseButton::Left)), (Action::Secondary, InputKind::Mouse(MouseButton::Right)),
+                                       //(Action::MenuBack, InputKind::PhysicalKey(KeyCode::Escape)),
+                        ]);
+    //input_map.insert_dual_axis(Action::Look, MouseMove::default());
+    input_map.insert(Action::Primary, MouseButton::Left);
+    input_map.insert(Action::Secondary, MouseButton::Right);
+    input_map.insert(Action::MenuBack, KeyCode::Escape);
+
     // Player
     commands.spawn((
         /*
@@ -424,11 +440,12 @@ pub fn setup (
         Gravity(14.0),
         Player,
         MoveToSpawn,
+        //InputManagerBundle::with_map(input_map),
         InputManagerBundle::<Action> {
-            // Stores "which actions are currently pressed"
+             //Stores "which actions are currently pressed"
             action_state: ActionState::default(),
-            // Describes how to convert from player inputs into those actions
-            input_map: InputMap::new(INPUT_MAP),
+             //Describes how to convert from player inputs into those actions
+            input_map: input_map,
         },
         //Transform::default(),
         //GlobalTransform::default(),

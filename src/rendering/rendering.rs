@@ -449,7 +449,7 @@ pub struct Atlas{
     #[asset(path = "textures_8x8.png")]
     pub res_8x8: Handle<Image>,
 
-    #[asset(texture_atlas_layout(tile_size_x = 8., tile_size_y = 8., columns = 32, rows = 32, padding_x = 0., padding_y = 0., offset_x = 0., offset_y = 0.))]
+    #[asset(texture_atlas_layout(tile_size_x = 8, tile_size_y = 8, columns = 32, rows = 32, padding_x = 0, padding_y = 0, offset_x = 0, offset_y = 0))]
     pub items_8x8_layout: Handle<TextureAtlasLayout>,
     #[asset(path = "items_8x8.png")]
     pub items_8x8: Handle<Image>,
@@ -466,12 +466,13 @@ impl FromWorld for Materials {
         let mut system_state = SystemState::<(ResMut<Assets<BlockMaterial>>, Res<Atlas>)>::new(world);
         let (mut materials, atlas) = system_state.get_mut(world);
         Materials {
-            world_res_8x8: materials.add(BlockMaterial { color: Color::WHITE, color_texture: Some(atlas.res_8x8.clone()), alpha_mode: AlphaMode::Mask(0.0) }),
-            water_res_8x8: materials.add(BlockMaterial { color: Color::WHITE, color_texture: Some(atlas.res_8x8.clone()), alpha_mode: AlphaMode::Blend }),
+            world_res_8x8: materials.add(BlockMaterial {color_texture: Some(atlas.res_8x8.clone()), alpha_mode: AlphaMode::Mask(0.0)}),
+            water_res_8x8: materials.add(BlockMaterial {color_texture: Some(atlas.res_8x8.clone()), alpha_mode: AlphaMode::Blend}),
         }
     }
 }
 
+/*
 #[derive(Asset, AsBindGroup, TypePath, Debug, Clone)]
 struct ChunkMaterial {
     // Start at a high binding number to ensure bindings don't conflict
@@ -485,17 +486,19 @@ impl MaterialExtension for ChunkMaterial {
         "TODO.wgsl".into()
     }
 }
-
+ */
 
 // This struct defines the data that will be passed to your shader
 #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 pub struct BlockMaterial {
-    #[uniform(0)]
-    color: Color,
+    //#[uniform(0)]
+    //color: Color,
     #[texture(1)]
     #[sampler(2)]
     color_texture: Option<Handle<Image>>,
     alpha_mode: AlphaMode,
+    //#[uniform(3)]
+    //variation_grid: Option<[u32; CHUNK_SIZE.pow(3) as usize]>,
 }
 
 /// The Material trait is very configurable, but comes with sensible defaults for all methods.
@@ -512,6 +515,6 @@ impl Material for BlockMaterial {
 
 impl From<Handle<Image>> for BlockMaterial {
     fn from(value: Handle<Image>) -> Self {
-        BlockMaterial {color: Color::WHITE, color_texture: Some(value), alpha_mode: AlphaMode::Opaque}
+        BlockMaterial {color_texture: Some(value), alpha_mode: AlphaMode::Opaque}
     }
 }
