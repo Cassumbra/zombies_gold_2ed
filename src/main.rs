@@ -10,7 +10,7 @@
 
 use std::f32::consts::PI;
 
-use bevy::{app::AppExit, ecs::schedule::ScheduleLabel, pbr::wireframe::WireframePlugin, prelude::*, render::{camera::RenderTarget, render_resource::{Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages}, texture::{ImageFilterMode, ImageSampler, ImageSamplerDescriptor}, Render, RenderSet}, window::WindowResolution};
+use bevy::{app::AppExit, ecs::schedule::ScheduleLabel, pbr::{wireframe::WireframePlugin, ExtendedMaterial}, prelude::*, render::{camera::RenderTarget, render_resource::{Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages}, texture::{ImageFilterMode, ImageSampler, ImageSamplerDescriptor}, Render, RenderSet}, window::WindowResolution};
 use bevy::transform::TransformSystem::TransformPropagate;
 use bevy_asset_loader::prelude::*;
 use bevy_mod_mipmap_generator::{generate_mipmaps, MipmapGeneratorPlugin, MipmapGeneratorSettings};
@@ -169,7 +169,7 @@ fn main () {
                 .init_resource::<Materials>()
         )
     .init_asset::<BlockMaterial>()
-    .add_plugins(MaterialPlugin::<BlockMaterial>::default())
+    .add_plugins(MaterialPlugin::<ExtendedMaterial<StandardMaterial, BlockMaterial>>::default())
     .add_plugins(bevy::diagnostic::FrameTimeDiagnosticsPlugin)
     .add_plugins(bevy::diagnostic::EntityCountDiagnosticsPlugin)
     .add_plugins(bevy::diagnostic::SystemInformationDiagnosticsPlugin)

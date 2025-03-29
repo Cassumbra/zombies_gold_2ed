@@ -1,7 +1,7 @@
 use std::mem::size_of;
 
 use bevy::{
-    ecs::system::SystemState, pbr::{ExtendedMaterial, MaterialExtension}, prelude::*, reflect::TypePath, render::render_resource::{AsBindGroup, Face, ShaderRef}
+    ecs::system::SystemState, pbr::{ExtendedMaterial, MaterialExtension, MaterialExtensionKey, MaterialExtensionPipeline, OpaqueRendererMethod}, prelude::*, reflect::TypePath, render::{mesh::MeshVertexBufferLayoutRef, render_resource::{AsBindGroup, Face, ShaderRef, VertexFormat}}
 };
 use bevy::render::camera::CameraProjection;
 use bevy::render::mesh::{Indices, MeshVertexAttribute, PrimitiveTopology, VertexAttributeValues};
@@ -202,7 +202,9 @@ pub fn update_chunk_meshes (
             let mut positions = Vec::with_capacity(num_vertices);
             let mut normals = Vec::with_capacity(num_vertices);
             let mut uvs = Vec::with_capacity(num_vertices);
+            let mut voxel_datas = Vec::with_capacity(buffer.num_quads());
             for (group, face) in buffer.groups.into_iter().zip(faces.into_iter()) {
+                voxel_datas.extend(vec![[0u32; 2]; group.len() * 4]);
                 for quad in group.into_iter() {
                     indices.extend_from_slice(&face.quad_mesh_indices(positions.len() as u32));
                     positions.extend_from_slice(&face.quad_mesh_positions(&quad.into(), 1.0));
@@ -267,6 +269,10 @@ pub fn update_chunk_meshes (
                 Mesh::ATTRIBUTE_UV_0,
                 VertexAttributeValues::Float32x2(uvs),
             );
+            render_mesh.insert_attribute(
+                ATTRIBUTE_VOXEL_DATA,
+                VertexAttributeValues::Uint32x2(voxel_datas),
+            );
             render_mesh.insert_indices(Indices::U32(indices.clone()));
     
             //println!("{:?}", render_mesh);
@@ -321,7 +327,9 @@ pub fn update_chunk_meshes (
             let mut positions = Vec::with_capacity(num_vertices);
             let mut normals = Vec::with_capacity(num_vertices);
             let mut uvs = Vec::with_capacity(num_vertices);
+            let mut voxel_datas = Vec::with_capacity(buffer.num_quads());
             for (group, face) in buffer.groups.into_iter().zip(faces.into_iter()) {
+                voxel_datas.extend(vec![[0u32; 2]; group.len() * 4]);
                 for quad in group.into_iter() {
                     indices.extend_from_slice(&face.quad_mesh_indices(positions.len() as u32));
                     positions.extend_from_slice(&face.quad_mesh_positions(&quad.into(), 1.0));
@@ -366,6 +374,10 @@ pub fn update_chunk_meshes (
                 Mesh::ATTRIBUTE_UV_0,
                 VertexAttributeValues::Float32x2(uvs),
             );
+            render_mesh.insert_attribute(
+                ATTRIBUTE_VOXEL_DATA,
+                VertexAttributeValues::Uint32x2(voxel_datas),
+            );
             render_mesh.insert_indices(Indices::U32(indices.clone()));
     
             //println!("{:?}", render_mesh);
@@ -390,16 +402,16 @@ pub fn update_chunk_meshes (
 
 pub fn modify_materials (
     materials: Res<Materials>,
-    mut material_assets: ResMut<Assets<BlockMaterial>>,
+    mut material_assets: ResMut<Assets<ExtendedMaterial<StandardMaterial, BlockMaterial>>>,
 ) {
     if let Some(world_res_8x8) = material_assets.get_mut(&materials.world_res_8x8) {
         //world_res_8x8.unlit = true;
-        world_res_8x8.alpha_mode = AlphaMode::Mask(0.0);
+        world_res_8x8.base.alpha_mode = AlphaMode::Mask(0.0);
     }
 
     if let Some(water_res_8x8) = material_assets.get_mut(&materials.water_res_8x8) {
         //water_res_8x8.unlit = true;
-        water_res_8x8.alpha_mode = AlphaMode::Blend;
+        water_res_8x8.base.alpha_mode = AlphaMode::Blend;
         //water_res_8x8.cull_mode = Some(Face::Back);
         //water_res_8x8.double_sided = true;
     }
@@ -407,7 +419,7 @@ pub fn modify_materials (
 
 pub fn update_water_material (
     materials: Res<Materials>,
-    mut material_assets: ResMut<Assets<BlockMaterial>>,
+    mut material_assets: ResMut<Assets<ExtendedMaterial<StandardMaterial, BlockMaterial>>>,
     chunk_map: Res<ChunkMap>,
 
     camera_query: Query<(&GlobalTransform, &Projection), (With<Camera>)>, //, Changed<GlobalTransform>
@@ -457,17 +469,29 @@ pub struct Atlas{
 
 #[derive(Resource)]
 pub struct Materials{
-    pub world_res_8x8: Handle<BlockMaterial>,
-    pub water_res_8x8: Handle<BlockMaterial>,
+    pub world_res_8x8: Handle<ExtendedMaterial<StandardMaterial, BlockMaterial>>,
+    pub water_res_8x8: Handle<ExtendedMaterial<StandardMaterial, BlockMaterial>>,
 }
 
 impl FromWorld for Materials {
     fn from_world(world: &mut World) -> Self {
-        let mut system_state = SystemState::<(ResMut<Assets<BlockMaterial>>, Res<Atlas>)>::new(world);
+        let mut system_state = SystemState::<(ResMut<Assets<ExtendedMaterial<StandardMaterial, BlockMaterial>>>, Res<Atlas>)>::new(world);
         let (mut materials, atlas) = system_state.get_mut(world);
         Materials {
-            world_res_8x8: materials.add(BlockMaterial {color_texture: Some(atlas.res_8x8.clone()), alpha_mode: AlphaMode::Mask(0.0)}),
-            water_res_8x8: materials.add(BlockMaterial {color_texture: Some(atlas.res_8x8.clone()), alpha_mode: AlphaMode::Blend}),
+            world_res_8x8: materials.add(ExtendedMaterial {
+                base: StandardMaterial {
+
+                    ..default()
+                },
+                extension: BlockMaterial {color_texture: Some(atlas.res_8x8.clone()), alpha_mode: AlphaMode::Mask(0.0)},
+            }),
+            water_res_8x8: materials.add(ExtendedMaterial {
+                base: StandardMaterial {
+
+                    ..default()
+                },
+                extension: BlockMaterial {color_texture: Some(atlas.res_8x8.clone()), alpha_mode: AlphaMode::Blend},
+            }),
         }
     }
 }
@@ -493,23 +517,42 @@ impl MaterialExtension for ChunkMaterial {
 pub struct BlockMaterial {
     //#[uniform(0)]
     //color: Color,
-    #[texture(1)]
-    #[sampler(2)]
+    #[texture(100)]
+    #[sampler(101)]
     color_texture: Option<Handle<Image>>,
     alpha_mode: AlphaMode,
     //#[uniform(3)]
     //variation_grid: Option<[u32; CHUNK_SIZE.pow(3) as usize]>,
 }
 
+pub const ATTRIBUTE_VOXEL_DATA: MeshVertexAttribute =
+    MeshVertexAttribute::new("VoxelData", 48757581, VertexFormat::Uint32x2);
+
 /// The Material trait is very configurable, but comes with sensible defaults for all methods.
 /// You only need to implement functions for features that need non-default behavior. See the Material api docs for details!
-impl Material for BlockMaterial {
+impl MaterialExtension for BlockMaterial {
+    fn vertex_shader() -> ShaderRef {
+        "shaders/custom_material.wgsl".into()
+    }
+
     fn fragment_shader() -> ShaderRef {
         "shaders/custom_material.wgsl".into()
     }
 
-    fn alpha_mode(&self) -> AlphaMode {
-        self.alpha_mode
+    //fn alpha_mode(&self) -> AlphaMode {
+    //    self.alpha_mode
+    //}
+
+    
+    fn specialize(
+            _pipeline: &MaterialExtensionPipeline,
+            descriptor: &mut bevy::render::render_resource::RenderPipelineDescriptor,
+            layout: &MeshVertexBufferLayoutRef,
+            _key: MaterialExtensionKey<BlockMaterial>,
+        ) -> Result<(), bevy::render::render_resource::SpecializedMeshPipelineError> {
+            let vertex_layout = layout.0.get_layout(&[ATTRIBUTE_VOXEL_DATA.at_shader_location(0)])?;
+            descriptor.vertex.buffers = vec![vertex_layout];
+            Ok(())
     }
 }
 
