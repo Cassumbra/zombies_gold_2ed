@@ -1,10 +1,10 @@
 use std::time::Duration;
 
-use bevy::prelude::*;
+use bevy::{prelude::*, time::Stopwatch};
 
 use movement::*;
 
-use crate::{block_pos_from_global, chunk_pos_from_global, raycast_blocks, update_chunk_events_from_global, Block, BlockID, Chunk, ChunkMap, Inventory, UpdateChunkEvent, CHUNK_SIZE};
+use crate::{block_pos_from_global, chunk_pos_from_global, raycast_blocks, update_chunk_events_from_global, Block, BlockID, BlockUpdateEvent, Chunk, ChunkMap, Inventory, UpdateChunkEvent, CHUNK_SIZE};
 pub mod movement;
 
 
@@ -132,6 +132,7 @@ pub fn damage_block (
 
     mut evr_damage_block: EventReader<DamageBlockEvent>,
     mut evw_update_chunk: EventWriter<UpdateChunkEvent>,
+    mut evw_block_update: EventWriter<BlockUpdateEvent>,
 ) {
     for ev in evr_damage_block.read() {
         let chunk_pos = chunk_pos_from_global(ev.position);
@@ -146,6 +147,7 @@ pub fn damage_block (
             if ev.strength >= attributes.toughness {
                 chunk.blocks[block_pos].damage = chunk.blocks[block_pos].damage + ev.damage;
 
+                // TODO: Should we condense things by just sending these when we handle block updates?
                 for event in update_chunk_events_from_global(ev.position) {
                     evw_update_chunk.send(event);
                 }
@@ -164,6 +166,7 @@ pub fn damage_block (
                 if chunk.blocks[block_pos].damage == attributes.health {
                     chunk.blocks[block_pos] = Block::new(attributes.breaks_into);
                     //println!("new block: {:?}", attributes.breaks_into);
+                    evw_block_update.send(BlockUpdateEvent { position: ev.position, time_waited: Stopwatch::new() });
                 }
             }
         }
@@ -231,6 +234,7 @@ pub fn place_block (
 
     mut evr_put_block: EventReader<PutBlockEvent>,
     mut evw_update_chunk: EventWriter<UpdateChunkEvent>,
+    mut evw_block_update: EventWriter<BlockUpdateEvent>,
 ) {
     'events: for ev in evr_put_block.read() {
         let chunk_pos = chunk_pos_from_global(ev.position);
@@ -260,6 +264,7 @@ pub fn place_block (
                 }
 
                 chunk.blocks[block_pos] = Block::new(ev.id);
+                evw_block_update.send(BlockUpdateEvent { position: ev.position, time_waited: Stopwatch::new() });
 
                 for event in update_chunk_events_from_global(ev.position) {
                     evw_update_chunk.send(event);

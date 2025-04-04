@@ -1,5 +1,5 @@
 use std::{collections::VecDeque, ops::{Range, RangeBounds}};
-use bevy::{math::Vec3A, prelude::*, render::{self, render_resource::ShaderType}, utils::{HashMap, HashSet}};
+use bevy::{ecs::event::ManualEventReader, math::Vec3A, prelude::*, render::{self, render_resource::ShaderType}, time::Stopwatch, utils::{HashMap, HashSet}};
 use fastrand::{Rng, choice};
 use itertools::{iproduct, Itertools};
 //use grid_tree::OctreeU32;
@@ -25,6 +25,7 @@ impl Plugin for MapPlugin {
             .init_resource::<ChunkMap>()
             .init_resource::<PendingModificationMap>()
             .init_resource::<ChunkLoadingQueue>()
+            .add_event::<BlockUpdateEvent>()
             .add_event::<LoadChunkEvent>()
             .add_event::<LoadReasonChangeEvent>()
             .add_event::<UpdateChunkEvent>()
@@ -333,6 +334,74 @@ pub fn unload_chunks (
     }
 }
 
+pub fn process_block_updates (
+    time: Res<Time>,
+    mut chunk_map: ResMut<ChunkMap>,
+    mut block_update_events: ResMut<Events<BlockUpdateEvent>>,
+
+    mut evw_update_chunk: EventWriter<UpdateChunkEvent>,
+    mut mevr_block_update: Local<ManualEventReader<BlockUpdateEvent>>,
+
+    
+) {
+    let mut thirsty_blocks = Vec::<IVec3>::new();
+    let mut requeue_queue = Vec::<BlockUpdateEvent>::new();
+
+    for ev in mevr_block_update.read(&block_update_events) {
+        let chunk_pos = chunk_pos_from_global(ev.position);
+
+        if (ev.time_waited.elapsed() + time.delta()).as_millis() < 200 {
+            let mut requeue_ev = ev.clone();
+            requeue_ev.time_waited.tick(time.delta());
+            requeue_queue.push(requeue_ev);
+            continue
+        }
+
+        // Can't borrow both mutably here and immutably later. Guess we gotta make a vec to process through after we look at everything?
+        if let Some(chunk) = chunk_map.get(&chunk_pos) {
+            let block_pos = block_pos_from_global(ev.position);
+
+            if chunk.blocks[block_pos].id == BlockID::Air {
+                for adj in ev.position.adj_6() {
+                    if ev.position.y - adj.y == 1 {
+                        continue
+                    }
+                    let chunk_pos_adj = chunk_pos_from_global(adj);
+                    if let Some(chunk_adj) = chunk_map.get(&chunk_pos_adj) {
+                        let block_pos_adj = block_pos_from_global(adj);
+                        if chunk_adj.blocks[block_pos_adj].id == BlockID::Water {
+                            thirsty_blocks.push(ev.position);
+                            break
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for ev in requeue_queue {
+        block_update_events.send(ev);
+    }
+
+    for position in thirsty_blocks {
+        let chunk_pos = chunk_pos_from_global(position);
+
+        if let Some(chunk) = chunk_map.get_mut(&chunk_pos) {
+            let block_pos = block_pos_from_global(position);
+            chunk.blocks[block_pos] = Block::new(BlockID::Water);
+
+            for adj in position.adj_6() {
+                block_update_events.send(BlockUpdateEvent { position: adj, time_waited: Stopwatch::new() });
+            }
+
+            for event in update_chunk_events_from_global(position) {
+                evw_update_chunk.send(event);
+            } 
+        }
+    }
+
+}
+
 pub fn update_chunk_positions (
     mut query: Query<(&GlobalTransform, &mut ChunkPosition), (Changed<GlobalTransform>)>,
 ) {
@@ -414,6 +483,12 @@ pub fn update_chunk_loaders (
 
 #[derive(Default, Clone, Deref, DerefMut, Resource)]
 pub struct ChunkLoadingQueue(VecDeque<LoadChunkEvent>);
+
+#[derive(Clone, Event)]
+pub struct BlockUpdateEvent {
+    pub position: IVec3,
+    pub time_waited: Stopwatch
+}
 
 #[derive(Clone, Copy, Event)]
 pub struct LoadChunkEvent {

@@ -6,20 +6,20 @@
     windows_subsystem = "windows"
 )]
 
-#![feature(const_fn_floating_point_arithmetic)]
+//#![feature(const_fn_floating_point_arithmetic)]
 
-use std::f32::consts::PI;
+//use std::f32::consts::PI;
 
 use bevy::{app::AppExit, ecs::schedule::ScheduleLabel, pbr::wireframe::WireframePlugin, prelude::*, render::{camera::RenderTarget, render_resource::{Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages}, texture::{ImageFilterMode, ImageSampler, ImageSamplerDescriptor}, Render, RenderSet}, window::WindowResolution};
 use bevy::transform::TransformSystem::TransformPropagate;
 use bevy_asset_loader::prelude::*;
-use bevy_mod_mipmap_generator::{generate_mipmaps, MipmapGeneratorPlugin, MipmapGeneratorSettings};
+//use bevy_mod_mipmap_generator::{generate_mipmaps, MipmapGeneratorPlugin, MipmapGeneratorSettings};
 use fastrand::Rng;
 use iyes_perf_ui::PerfUiPlugin;
 //use bevy_flycam::PlayerPlugin;
 use leafwing_input_manager::prelude::*;
-use moonshine_save::{save::SavePlugin, load::LoadPlugin};
-use image::{imageops::FilterType};
+//use moonshine_save::{save::SavePlugin, load::LoadPlugin};
+//use image::{imageops::FilterType};
 //use bevy::render::settings::WgpuSettings;
 
 
@@ -216,6 +216,7 @@ fn main () {
     .add_systems(Update, damage_block)
     .add_systems(Update, building)
     .add_systems(Update, place_block)
+    .add_systems(Update, process_block_updates)
     
     .add_systems(Update, player_input_game)
     
