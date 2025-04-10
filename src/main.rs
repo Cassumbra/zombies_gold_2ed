@@ -10,7 +10,9 @@
 
 //use std::f32::consts::PI;
 
-use bevy::{app::AppExit, ecs::schedule::ScheduleLabel, pbr::wireframe::WireframePlugin, prelude::*, render::{camera::RenderTarget, render_resource::{Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages}, texture::{ImageFilterMode, ImageSampler, ImageSamplerDescriptor}, Render, RenderSet}, window::WindowResolution};
+use std::collections::BTreeMap;
+
+use bevy::{app::AppExit, ecs::schedule::ScheduleLabel, pbr::wireframe::WireframePlugin, prelude::*, render::{camera::RenderTarget, render_resource::{Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages}, texture::{ImageFilterMode, ImageSampler, ImageSamplerDescriptor}, Render, RenderSet}, utils::HashMap, window::WindowResolution};
 use bevy::transform::TransformSystem::TransformPropagate;
 use bevy_asset_loader::prelude::*;
 //use bevy_mod_mipmap_generator::{generate_mipmaps, MipmapGeneratorPlugin, MipmapGeneratorSettings};
@@ -46,6 +48,10 @@ use log::*;
 mod map;
 use map::*;
 
+#[path = "mechanics/mechanics.rs"]
+mod mechanics;
+use mechanics::*;
+
 #[path = "physics/physics.rs"]
 mod physics;
 use physics::*;
@@ -57,6 +63,10 @@ use player::*;
 #[path = "rendering/rendering.rs"]
 mod rendering;
 use rendering::*;
+
+#[path = "stats/stats.rs"]
+mod stats;
+use stats::*;
 
 #[path = "ui/ui.rs"]
 mod ui;
@@ -198,7 +208,7 @@ fn main () {
 
     
     .add_systems(Startup, setup)
-    .add_systems(Startup, setup_ui)
+    .add_systems(OnEnter(GameState::Playing), setup_ui)
 
     .add_systems(OnEnter(GameState::Playing), modify_materials)
     .add_systems(PostUpdate, update_water_material.run_if(in_state(GameState::Playing)).after(TransformPropagate).before(RenderSet::PrepareAssets))
@@ -217,6 +227,7 @@ fn main () {
     .add_systems(Update, building)
     .add_systems(Update, place_block)
     .add_systems(Update, process_block_updates)
+    .add_systems(Update, handle_breath)
     
     .add_systems(Update, player_input_game)
     
@@ -233,6 +244,7 @@ fn main () {
     )
 
     .add_systems(Update, update_resource_counts.run_if(in_state(GameState::Playing)))
+    .add_systems(Update, update_breath_ui.run_if(in_state(GameState::Playing)))
     .add_systems(Update, update_progress_bar)
     .add_systems(Update, fit_canvas)
      
@@ -436,6 +448,11 @@ pub fn setup (
         MiningTimer::default(),
         BuildingTimer::default(),
         Inventory::default(),
+        Stats(HashMap::from([
+            (StatType::Health, Stat::new(0.0, 20.0)),
+            (StatType::Breath, Stat::new(0.0, 100.0)),
+        ])),
+        HasAir(true),
     ))
     .add_child(camera_entity);
 }

@@ -452,6 +452,10 @@ pub struct Atlas{
     pub items_8x8_layout: Handle<TextureAtlasLayout>,
     #[asset(path = "items_8x8.png")]
     pub items_8x8: Handle<Image>,
+    #[asset(texture_atlas_layout(tile_size_x = 16., tile_size_y = 16., columns = 16, rows = 16, padding_x = 0., padding_y = 0., offset_x = 0., offset_y = 0.))]
+    pub ui_16x16_layout: Handle<TextureAtlasLayout>,
+    #[asset(path = "ui_8x8.png")]
+    pub ui_16x16: Handle<Image>,
 }
 
 #[derive(AssetCollection, Resource)]

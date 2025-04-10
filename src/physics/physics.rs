@@ -1,7 +1,7 @@
 use bevy::{prelude::*, utils::HashSet};
 use itertools::{iproduct, izip};
 
-use crate::{block_pos_from_global, chunk_pos_from_global, BlockID, Chunk, ChunkMap, Solidity};
+use crate::{block_pos_from_global, chunk_pos_from_global, BlockID, Chunk, ChunkMap, HasAir, Solidity};
 
 pub const BLOCK_AABB: AabbCollider = AabbCollider{ width: 1.0, height: 1.0, length: 1.0 };
 
@@ -22,19 +22,20 @@ pub fn apply_gravity (
 pub fn do_physics (
     mut commands: Commands,
 
-    mut query: Query<(Entity, &mut Transform, &mut LinearVelocity, Option<&AabbCollider>,)>,
+    mut query: Query<(Entity, &mut Transform, &mut LinearVelocity, Option<&AabbCollider>, Option<&mut HasAir>)>,
 
     time: Res<Time>,
     chunk_map: Res<ChunkMap>,
 
 ) {
-    for (entity, mut transform, mut velocity, opt_collider) in &mut query {
+    for (entity, mut transform, mut velocity, opt_collider, mut opt_has_air) in &mut query {
         let frame_velocity = **velocity * time.delta_seconds();
 
         if let Some(collider) = opt_collider {
             let step_count = (frame_velocity * 4.0).abs().max_element().ceil() as i32;
             
             let mut in_water = false;
+            let mut mouth_submerged = false;
 
             //println!("vrooms: {}", frame_velocity);
             //println!("steps: {}", step_count);
@@ -70,7 +71,19 @@ pub fn do_physics (
                                 top_box.height /= 2.0;
                                 let mut top_box_pos = transform.translation;
                                 top_box_pos.y += top_box.height / 2.0;
-                                if !in_water {in_water = top_box.get_intersection(top_box_pos, BLOCK_AABB, global_block_position.as_vec3())};
+
+                                let mut mouth_box = top_box;
+                                mouth_box.height /= 4.0;
+                                mouth_box.width /= 4.0;
+                                mouth_box.length /= 4.0;
+                                let mut mouth_box_pos = top_box_pos;
+                                mouth_box_pos.y += top_box.height / 8.0;
+                                if !in_water {
+                                    in_water = top_box.get_intersection(top_box_pos, BLOCK_AABB, global_block_position.as_vec3());
+                                }
+                                if !mouth_submerged {
+                                    mouth_submerged = mouth_box.get_intersection(mouth_box_pos, BLOCK_AABB, global_block_position.as_vec3());
+                                }
                             },
                         }
                         return None;
@@ -155,6 +168,10 @@ pub fn do_physics (
                         collisions_new.push(BlockCollision::new(collision.position, penetration, normal, collision.id));
                     }
                 }
+            }
+
+            if let Some(ref mut has_air) = opt_has_air {
+                ***has_air = !mouth_submerged;
             }
 
             let _ = if in_water {surface_contacts.insert(SurfaceContact::Water)} else {false};

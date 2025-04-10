@@ -1,12 +1,13 @@
 use bevy::{a11y::AccessibilityNode, prelude::*};
 use iyes_perf_ui::PerfUiCompleteBundle;
 
-use crate::{Atlas, BuildingEvent, BuildingTimer, Inventory, ItemID, MiningEvent, MiningTimer, Player};
+use crate::{Atlas, BuildingEvent, BuildingTimer, HasAir, Inventory, ItemID, MiningEvent, MiningTimer, Player, StatType, Stats};
 
 
 pub fn setup_ui (
     mut commands: Commands,
     //asset_server: Res<AssetServer>,
+    atlas: Res<Atlas>,
 ) {
     commands.spawn(PerfUiCompleteBundle::default());
 
@@ -26,6 +27,7 @@ pub fn setup_ui (
 
     ..default()
     }).with_children(|parent| {
+        // The stupid thingy that keeps the crosshair centered.
         parent.spawn(NodeBundle {
             style: Style {
                 width: Val::Px(50.0),
@@ -36,6 +38,7 @@ pub fn setup_ui (
             ..default()
         });
 
+        // Crosshair
         parent.spawn((
             // Create a TextBundle that has a Text with a single section.
             TextBundle::from_section(
@@ -56,6 +59,7 @@ pub fn setup_ui (
             }),
         ));
 
+        // Progress Bar
         parent.spawn(NodeBundle {
             style: Style {
                 width: Val::Px(50.0),
@@ -93,6 +97,161 @@ pub fn setup_ui (
         ..default()
     })
     .insert(ItemDisplayRoot);
+
+    /*
+    commands.spawn(NodeBundle {
+        style: Style {
+            flex_direction: FlexDirection::Row,
+            
+            ..default()
+        },
+
+        ..default()
+    });
+    //.insert(HotBarRoot); */
+
+    commands.spawn(NodeBundle {
+        style: Style {
+            flex_direction: FlexDirection::Column,
+            
+            position_type: PositionType::Absolute,
+            align_items: AlignItems::Center,
+            justify_items: JustifyItems::Center,
+            align_self: AlignSelf::End,
+            justify_self: JustifySelf::Center,
+            align_content: AlignContent::Center,
+            justify_content: JustifyContent::Center,
+            
+            ..default()
+        },
+
+    ..default()
+    }).with_children(|parent| {
+        parent.spawn(NodeBundle {
+            style: Style {
+                flex_direction: FlexDirection::Row,
+                
+                //position_type: PositionType::Absolute,
+                //align_items: AlignItems::Center,
+                //justify_items: JustifyItems::Center,
+                align_self: AlignSelf::Start,
+                justify_self: JustifySelf::Start,
+                align_content: AlignContent::Start,
+                justify_content: JustifyContent::Start,
+                
+                ..default()
+            },
+
+            ..default()
+        }).with_children(|parent| {
+            for _ in 0..=3 {
+                parent.spawn(ImageBundle {
+                    style: Style {
+                        width: Val::Px(64.),
+                        height: Val::Px(64.),
+                        ..default()
+                    },
+                    image: UiImage::new(atlas.ui_16x16.clone()),
+                    ..default()
+                    },
+                    )
+                    .insert(TextureAtlas{ layout: atlas.ui_16x16_layout.clone(), index: 19 as usize});
+            }
+        });
+
+        parent.spawn(NodeBundle {
+            style: Style {
+                flex_direction: FlexDirection::Row,
+                
+                /*
+                position_type: PositionType::Absolute,
+                align_items: AlignItems::Center,
+                justify_items: JustifyItems::Center,
+                align_self: AlignSelf::End,
+                justify_self: JustifySelf::Center,
+                align_content: AlignContent::Center,
+                justify_content: JustifyContent::Center, */
+                
+                ..default()
+            },
+
+            ..default()
+        }).with_children(|parent| {
+            for _ in 0..=9 {
+                parent.spawn(ImageBundle {
+                    style: Style {
+                        width: Val::Px(64.),
+                        height: Val::Px(64.),
+                        ..default()
+                    },
+                    image: UiImage::new(atlas.ui_16x16.clone()),
+                    ..default()
+                    },
+                    )
+                    .insert(TextureAtlas{ layout: atlas.ui_16x16_layout.clone(), index: 34 as usize});
+            }
+        });
+        
+        }
+        );
+
+        commands.spawn(NodeBundle {
+            style: Style {
+                flex_direction: FlexDirection::Row,
+                
+                position_type: PositionType::Absolute,
+                align_items: AlignItems::End,
+                justify_items: JustifyItems::End,
+                align_self: AlignSelf::End,
+                justify_self: JustifySelf::End,
+                align_content: AlignContent::End,
+                justify_content: JustifyContent::End,
+
+                margin: UiRect::all(Val::Percent(0.0)),
+                padding:UiRect::all(Val::Percent(0.0)),
+                
+                ..default()
+            },
+    
+        ..default()
+        })
+        .insert(BreathRoot)
+        .with_children(|parent| {
+                parent.spawn(TextBundle::from_section("100", TextStyle { font_size: 75.0, color: Color::WHITE, ..default()}))
+                    .insert(BreathValue);
+
+                parent.spawn(ImageBundle {
+                    style: Style {
+                        width: Val::Px(64.),
+                        height: Val::Px(64.),
+                        ..default()
+                    },
+                    image: UiImage::new(atlas.ui_16x16.clone()),
+                    ..default()
+                    },
+                    )
+                    .insert(TextureAtlas{ layout: atlas.ui_16x16_layout.clone(), index: 3 as usize});
+            });
+}
+
+pub fn update_breath_ui (
+    mut commands: Commands,
+
+    player_query: Query<(&mut Stats), With<Player>>,
+    mut root_query: Query<(&mut Style), With<BreathRoot>>,
+    mut breath_value_query: Query<(&mut Text), With<BreathValue>>,
+) {
+    let stats = player_query.get_single().unwrap();
+    let mut breath_root_style = root_query.get_single_mut().unwrap();
+    let mut breath_value_text = breath_value_query.get_single_mut().unwrap();
+
+    if stats[&StatType::Breath].base < 100.0 {
+        breath_root_style.display = Display::Flex;
+    }
+    else {
+        breath_root_style.display = Display::None;
+    }
+    *breath_value_text = Text::from_section((stats[&StatType::Breath].base as i32).to_string(), TextStyle { font_size: 75.0, color: Color::WHITE, ..default()});
 }
 
 pub fn update_resource_counts (
@@ -217,3 +376,15 @@ pub struct ItemDisplayRoot;
 #[derive(Component, Clone, Debug, Reflect, Deref, DerefMut)]
 #[reflect(Component)]
 pub struct ItemDisplay(ItemID);
+
+#[derive(Component, Clone, Debug, Reflect)]
+#[reflect(Component)]
+pub struct HotBarRoot;
+
+#[derive(Component, Clone, Debug, Reflect)]
+#[reflect(Component)]
+pub struct BreathRoot;
+
+#[derive(Component, Clone, Debug, Reflect)]
+#[reflect(Component)]
+pub struct BreathValue;
