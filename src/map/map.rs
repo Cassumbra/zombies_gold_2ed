@@ -1,6 +1,7 @@
-use std::{collections::VecDeque, ops::{Range, RangeBounds}};
+use std::{collections::VecDeque, fs::File, io::{BufWriter, Write}, ops::{Range, RangeBounds}};
 use bevy::{ecs::event::ManualEventReader, math::Vec3A, prelude::*, render::{self, render_resource::ShaderType}, time::Stopwatch, utils::{HashMap, HashSet}};
 use fastrand::{Rng, choice};
+use flate2::{write::GzEncoder, Compression};
 use itertools::{iproduct, Itertools};
 //use grid_tree::OctreeU32;
 use noise::{core::worley::{distance_functions::{self, euclidean, euclidean_squared}, worley_3d, ReturnType}, permutationtable::PermutationTable, Blend, Constant, NoiseFn, Perlin, ScalePoint, Value, Worley};
@@ -25,6 +26,7 @@ impl Plugin for MapPlugin {
             .init_resource::<ChunkMap>()
             .init_resource::<PendingModificationMap>()
             .init_resource::<ChunkLoadingQueue>()
+            .init_resource::<ChunkUnloadingQueue>()
             .add_event::<BlockUpdateEvent>()
             .add_event::<LoadChunkEvent>()
             .add_event::<LoadReasonChangeEvent>()
@@ -317,21 +319,71 @@ pub fn unload_chunks (
     mut chunk_map: ResMut<ChunkMap>,
 
     mut evr_load_reason: EventReader<LoadReasonChangeEvent>,
+
+    mut unloading_queue: ResMut<ChunkUnloadingQueue>,
+
 ) {
+    **unloading_queue = VecDeque::from_iter(unloading_queue.iter().filter_map(|pos| if chunk_map.contains_key(pos) {Some(*pos)} else {None}));
+
+    /*
+    // Copied from chunk loading section
+    for ev in evr_load_reason.read() {
+        // Ignore chunks that are out of generation scope.
+        //if !((-WORLD_SIZE[0]..=WORLD_SIZE[0]).contains(&ev.x) && (-WORLD_SIZE[1]..=WORLD_SIZE[1]).contains(&ev.z) && (-WORLD_DEPTH..=WORLD_HEIGHT).contains(&ev.y)) {
+        //    continue
+        //}
+
+        // Check if there's already a chunk here.
+        //if chunk_map.contains_key(&ev.chunk) {
+        //    continue
+        //}
+
+        unloading_queue.push_front(ev);
+
+        /*
+        match ev.load_reason {
+            LoadReason::Loader(_) => loading_queue.push_front(*ev),
+            LoadReason::Spawning(_) => chunks_to_load.push(*ev),
+        } */
+    } */
+
     for (ev) in evr_load_reason.read() {
+        //println!("ehehee!!! {:?}", &**ev);
         if let Some(chunk) = chunk_map.get_mut(&**ev) {
             if chunk.load_reasons.is_empty() {
+                // TODO: could we be sending duplicate save requests into the queue...? need to be careful about this. unsure how.
+                unloading_queue.push_front(**ev);
+
+
+            }
+        }
+    }
+
+    //for _ in 0..1 {
+        if let Some(pos) = unloading_queue.pop_back() {
+            if let Some(chunk) = chunk_map.get_mut(&pos) {
                 if let Some(render_entity) = chunk.render_entity {
                     commands.entity(render_entity).despawn();
                 }
                 if let Some(water_render_entity) = chunk.water_render_entity {
                     commands.entity(water_render_entity).despawn();
                 }
-                chunk_map.remove(&**ev);
-                //println!("yeet...");
+                
+                //let f = File::create("saves/1/chunks/savetest.txt").unwrap();
+                let f = File::create(format!("saves/1/chunks/x{:}y{:}z{:}.chunk", pos.x.to_string(), pos.y.to_string(), pos.z.to_string())).unwrap();
+                let mut e = GzEncoder::new(f, Compression::new(1));
+                //let mut f = BufWriter::new(f);
+                //let mut buffer: &[u8; ((CHUNK_SIZE.pow(3)) * 2) as usize];
+                for block in chunk_map.get(&pos).unwrap().blocks.iter() {
+                    e.write(&[block.id as u8, block.damage]).unwrap();
+                }
+                //e.flush(); 
+
+                chunk_map.remove(&pos);
+                //println!("yeet... {:?}", pos);
             }
         }
-    }
+    //}
 }
 
 pub fn process_block_updates (
@@ -483,6 +535,9 @@ pub fn update_chunk_loaders (
 
 #[derive(Default, Clone, Deref, DerefMut, Resource)]
 pub struct ChunkLoadingQueue(VecDeque<LoadChunkEvent>);
+
+#[derive(Default, Clone, Deref, DerefMut, Resource)]
+pub struct ChunkUnloadingQueue(VecDeque<IVec3>);
 
 #[derive(Clone, Event)]
 pub struct BlockUpdateEvent {
