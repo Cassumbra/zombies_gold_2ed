@@ -1,13 +1,14 @@
-use std::{collections::VecDeque, fs::File, io::{BufWriter, Write}, ops::{Range, RangeBounds}};
+use std::{collections::VecDeque, fs::File, io::{BufWriter, Write}, ops::{Range, RangeBounds}, time::Instant};
 use bevy::{ecs::event::ManualEventReader, math::Vec3A, prelude::*, render::{self, render_resource::ShaderType}, time::Stopwatch, utils::{HashMap, HashSet}};
 use fastrand::{Rng, choice};
-use flate2::{write::GzEncoder, Compression};
+use flate2::{write::{DeflateEncoder, GzEncoder}, Compression};
 use itertools::{iproduct, Itertools};
 //use grid_tree::OctreeU32;
 use noise::{core::worley::{distance_functions::{self, euclidean, euclidean_squared}, worley_3d, ReturnType}, permutationtable::PermutationTable, Blend, Constant, NoiseFn, Perlin, ScalePoint, Value, Worley};
 //use rand::{seq::SliceRandom, thread_rng};
 use derive_more::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign, };
 use bevy::{ecs::{entity::{EntityMapper, MapEntities}, reflect::ReflectMapEntities}, prelude::*};
+use rusqlite::{params, Connection};
 use crate::{directions::{DIR_6, DIR_6_NO_DOWN}, grid3::Grid3, point::GridPoint, Item, ItemID, MoveToSpawn, RNGSeed, Slip, CHUNK_SIZE, WORLD_DEPTH, WORLD_HEIGHT, WORLD_SIZE};
 
 use crate::sparse_grid3::SparseGrid3;
@@ -27,6 +28,7 @@ impl Plugin for MapPlugin {
             .init_resource::<PendingModificationMap>()
             .init_resource::<ChunkLoadingQueue>()
             .init_resource::<ChunkUnloadingQueue>()
+            .init_resource::<ChunkSavingQueue>()
             .add_event::<BlockUpdateEvent>()
             .add_event::<LoadChunkEvent>()
             .add_event::<LoadReasonChangeEvent>()
@@ -321,6 +323,7 @@ pub fn unload_chunks (
     mut evr_load_reason: EventReader<LoadReasonChangeEvent>,
 
     mut unloading_queue: ResMut<ChunkUnloadingQueue>,
+    mut save_queue: ResMut<ChunkSavingQueue>,
 
 ) {
     **unloading_queue = VecDeque::from_iter(unloading_queue.iter().filter_map(|pos| if chunk_map.contains_key(pos) {Some(*pos)} else {None}));
@@ -359,7 +362,7 @@ pub fn unload_chunks (
         }
     }
 
-    //for _ in 0..1 {
+    for _ in 0..4 {
         if let Some(pos) = unloading_queue.pop_back() {
             if let Some(chunk) = chunk_map.get_mut(&pos) {
                 if let Some(render_entity) = chunk.render_entity {
@@ -368,22 +371,74 @@ pub fn unload_chunks (
                 if let Some(water_render_entity) = chunk.water_render_entity {
                     commands.entity(water_render_entity).despawn();
                 }
-                
-                //let f = File::create("saves/1/chunks/savetest.txt").unwrap();
-                let f = File::create(format!("saves/1/chunks/x{:}y{:}z{:}.chunk", pos.x.to_string(), pos.y.to_string(), pos.z.to_string())).unwrap();
-                let mut e = GzEncoder::new(f, Compression::new(1));
-                //let mut f = BufWriter::new(f);
-                //let mut buffer: &[u8; ((CHUNK_SIZE.pow(3)) * 2) as usize];
+
+                let mut e = DeflateEncoder::new(Vec::new(), Compression::default());
                 for block in chunk_map.get(&pos).unwrap().blocks.iter() {
                     e.write(&[block.id as u8, block.damage]).unwrap();
                 }
-                //e.flush(); 
+
+                //let _ = conn.execute(&format!("INSERT INTO Chunks(PosX, PosY, PosZ, ChunkData) ({}, {}, {}, X'{}') ", pos.x, pos.y, pos.z, hex_string), []);
+                //let _ = conn.execute("INSERT INTO Chunks(PosX, PosY, PosZ, ChunkData) (?1, ?2, ?3, X'?4') ", (pos.x, pos.y, pos.z, hex_string));
+
+                save_queue.push((pos, e.finish().unwrap()));
+                /*
+                match conn.execute(&format!("INSERT INTO Chunks (PosX, PosY, PosZ, ChunkData) VALUES (?1, ?2, ?3, X'{}')
+                                        ON CONFLICT(PosX, PosY, PosZ) DO UPDATE SET ChunkData=excluded.ChunkData;", hex_string), (pos.x, pos.y, pos.z)) {
+                    Ok(updated) => {} //println!("{} rows were updated", updated),
+                    Err(err) => {} //println!("update failed: {}", err),
+                } */
+
+                
+
+                //let f = File::create(format!("saves/1/chunks/x{:}y{:}z{:}.chunk", pos.x.to_string(), pos.y.to_string(), pos.z.to_string())).unwrap();
+                //let mut e = GzEncoder::new(f, Compression::new(1));
+                //for block in chunk_map.get(&pos).unwrap().blocks.iter() {
+                //    e.write(&[block.id as u8, block.damage]).unwrap();
+                //}
+
+                //conn.drop();
 
                 chunk_map.remove(&pos);
                 //println!("yeet... {:?}", pos);
             }
         }
-    //}
+        else {
+            break;
+        }
+    }
+}
+
+pub fn save_chunks (
+    mut save_queue: ResMut<ChunkSavingQueue>,
+) {
+    if save_queue.len() > 1000 {
+        let start = Instant::now();
+        let conn = Connection::open("saves/1.sl3").unwrap();
+        conn.execute("begin", []);
+        let mut stmt = conn.prepare("INSERT INTO Chunks (PosX, PosY, PosZ, ChunkData) VALUES (?1, ?2, ?3, ?4)
+                                    ON CONFLICT(PosX, PosY, PosZ) DO UPDATE SET ChunkData=excluded.ChunkData;").unwrap();
+        /*
+        for (pos, chunk_data) in save_queue.iter() {
+            match conn.execute("INSERT INTO Chunks (PosX, PosY, PosZ, ChunkData) VALUES (?1, ?2, ?3, ?4)
+                                    ON CONFLICT(PosX, PosY, PosZ) DO UPDATE SET ChunkData=excluded.ChunkData;", (pos.x, pos.y, pos.z, chunk_data)) {
+                Ok(updated) => println!("{} rows were updated", updated),
+                Err(err) => println!("update failed: {}", err),
+            }
+        } */
+        for (pos, chunk_data) in save_queue.iter() {
+            match stmt.execute(params![pos.x, pos.y, pos.z, chunk_data]) {
+                Ok(updated) => {}, //println!("{} rows were updated", updated),
+                Err(err) => {}, //println!("update failed: {}", err),
+            }
+        } 
+
+
+        
+        conn.execute("end", []);
+        save_queue.clear();
+        let duration = start.elapsed();
+        println!("Time elapsed for upserts: {:?}", duration);
+    }
 }
 
 pub fn process_block_updates (
@@ -538,6 +593,9 @@ pub struct ChunkLoadingQueue(VecDeque<LoadChunkEvent>);
 
 #[derive(Default, Clone, Deref, DerefMut, Resource)]
 pub struct ChunkUnloadingQueue(VecDeque<IVec3>);
+
+#[derive(Default, Clone, Deref, DerefMut, Resource)]
+pub struct ChunkSavingQueue(Vec<(IVec3, Vec<u8>)>);
 
 #[derive(Clone, Event)]
 pub struct BlockUpdateEvent {

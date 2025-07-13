@@ -2278,12 +2278,12 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "2.2.6"
+version = "2.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "168fb715dda47215e360912c096649d23d58bf392ac62f73919e831745e40f26"
+checksum = "fe4cd85333e22411419a0bcae1297d25e58c9443848b11dc6a86fefe8c78a661"
 dependencies = [
  "equivalent",
- "hashbrown 0.14.3",
+ "hashbrown 0.15.4",
 ]
 
 [[package]]
@@ -4508,6 +4508,7 @@ dependencies = [
  "fastrand 2.0.2",
  "flate2",
  "image",
+ "indexmap",
  "itertools",
  "iyes_perf_ui",
  "leafwing-input-manager",

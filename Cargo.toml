@@ -27,6 +27,8 @@ block-mesh = "0.2.0"
 image = "0.24"
 flate2 = "1.1.2"
 rusqlite = { version = "0.37.0", features = ["bundled"] }
+#hex = "0.4.3"
+indexmap = "2.10.0"
 
 
 [features]

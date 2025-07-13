@@ -219,6 +219,7 @@ fn main () {
     .add_systems(Update, map::generate_chunks)
     //.add_systems(Update, map::read_modification_events)
     .add_systems(Update, map::unload_chunks)
+    .add_systems(Update, map::save_chunks)
 
     .add_systems(Update, rendering::update_chunk_meshes.run_if(in_state(GameState::Playing)))
     .add_systems(Update, move_to_spawn.run_if(in_state(GameState::Playing)))
