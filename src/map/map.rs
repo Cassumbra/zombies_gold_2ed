@@ -104,7 +104,10 @@ pub fn generate_chunks (
 
     // Load only a limited amount of chunks each frame to make things smoother.
     let conn = Connection::open("saves/1.sl3").unwrap();
-    while start.elapsed().as_millis() < 4 {
+    conn.execute("pragma SYNCHRONOUS = NORMAL", []);
+    let mut chunks_loaded = 0;
+    while start.elapsed().as_millis() < 2 {
+        let start_load_chunk = Instant::now();
         if let Some(ev) = loading_queue.pop_back() {
             //println!(":3");
             //println!("loading: {:?}", ev.chunk);
@@ -121,7 +124,8 @@ pub fn generate_chunks (
                                     render_entity,
                                     water_render_entity
                                   };
-                                      
+            
+            //let start_chunkdata = Instant::now();
             let potential_compressed_chunk: Option<Vec<u8>> =
             if let Some(data) = partial_save_map.get(&ev.chunk) {
                 Some(data.clone())
@@ -132,6 +136,7 @@ pub fn generate_chunks (
             else {
                 None
             };
+            //println!("time to get chunkdata: {:?}", start_chunkdata.elapsed());
 
             if let Some(compressed_chunk) = potential_compressed_chunk {
                 
@@ -142,31 +147,10 @@ pub fn generate_chunks (
                     Ok(bytes_read) => {} //println!("bytes read: {}", bytes_read),
                     Err(err) => {} //println!("update failed: {}", err),
                 }
-                let mut i = 0;
-                let mut chunk_data_iter = chunk_data.iter();
-                while i < CHUNK_SIZE.pow(3) as usize {
-                    if let Some((id, damage)) = chunk_data_iter.next_tuple() {
-                        chunk.blocks.data[i].id = BlockID::from_u8(*id);
-                        chunk.blocks.data[i].damage = *damage;
-                        //println!("{}, {}", id, i);
-                        i += 1;
-                    }
-                    else {
-                        break;
-                    }
+                for (i, data) in chunk_data.chunks(2).enumerate() {
+                    chunk.blocks.data[i].id = BlockID::from_u8(data[0]);
+                    chunk.blocks.data[i].damage = data[1];
                 }
-                /*
-                while let Some((id, damage)) = chunk_data.iter().next_tuple() {
-                    chunk.blocks.data[i].id = BlockID::from_u8(*id);
-                    chunk.blocks.data[i].damage = *damage;
-                    //println!("{}, {}", id, i);
-                    i += 1;
-                    if i == CHUNK_SIZE.pow(3) as usize {
-                        break
-                    }
-                } */
-
-                //todo!("{:?}", chunk_data)
             }
             else {
                 
@@ -237,11 +221,14 @@ pub fn generate_chunks (
             }
 
             chunk_status_map.insert(ev.chunk, ChunkStatus::Active);
+            chunks_loaded += 1;
         }
         else {
             break;
         }
+        //println!("time to load chunk: {:?}", start_load_chunk.elapsed());
     }
+    println!("chunks loaded this frame: {}", chunks_loaded);
     //next_mapgen_state.set(MapGenState::TempBand);
 }
 
@@ -411,7 +398,7 @@ pub fn unload_chunks (
     }
 
     
-    while start.elapsed().as_millis() < 4 || !close_requested_evr.is_empty() {
+    while start.elapsed().as_millis() < 1 || !close_requested_evr.is_empty() {
         if let Some(pos) = unloading_queue.pop_back() {
             if !chunk_map.contains_key(&pos) {
                 continue
@@ -449,10 +436,11 @@ pub fn save_chunks (
     mut exit_evw: EventWriter<AppExit>
 ) {
 
-    if !close_requested_evr.is_empty() {
+    if !close_requested_evr.is_empty() { //save_queue.len() > 10 || 
         let start = Instant::now();
         let conn = Connection::open("saves/1.sl3").unwrap();
         conn.execute("begin", []);
+        conn.execute("pragma SYNCHRONOUS = NORMAL", []);
         let mut stmt = conn.prepare("INSERT INTO Chunks (PosX, PosY, PosZ, ChunkData) VALUES (?1, ?2, ?3, ?4)
                                     ON CONFLICT(PosX, PosY, PosZ) DO UPDATE SET ChunkData=excluded.ChunkData;").unwrap();
 
@@ -467,7 +455,9 @@ pub fn save_chunks (
         save_queue.clear();
         let duration = start.elapsed();
         println!("Time elapsed for upserts: {:?}", duration);
-        exit_evw.send(AppExit);
+        if !close_requested_evr.is_empty() {
+            exit_evw.send(AppExit);
+        }
     }
 }
 
