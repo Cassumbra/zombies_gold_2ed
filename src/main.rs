@@ -219,7 +219,7 @@ fn main () {
     .add_systems(Update, map::generate_chunks)
     //.add_systems(Update, map::read_modification_events)
     .add_systems(Update, map::unload_chunks)
-    .add_systems(Update, map::save_chunks)
+    //.add_systems(Update, map::save_chunks)
 
     .add_systems(Update, rendering::update_chunk_meshes.run_if(in_state(GameState::Playing)))
     .add_systems(Update, move_to_spawn.run_if(in_state(GameState::Playing)))
@@ -276,12 +276,14 @@ pub fn move_to_spawn (
     mut commands: Commands,
 
     mut evw_load_chunk: EventWriter<LoadChunkEvent>,
+    mut chunk_status_map: ResMut<ChunkStatusMap>,
 ) {
     //println!("time to move arounda!");
     'entity_checks: for (entity, mut transform) in &mut query {
         'chunks: for chunk_y in (0..=WORLD_HEIGHT).rev() {
             //println!("chunk_y: {}", chunk_y);
-            if let Some(chunk) = chunk_map.get(&IVec3::new(SPAWN_CHUNK.x, chunk_y, SPAWN_CHUNK.z)) {
+            let chunk_pos = IVec3::new(SPAWN_CHUNK.x, chunk_y, SPAWN_CHUNK.z);
+            if let Some(chunk) = chunk_map.get(&chunk_pos) {
                 for (y, block) in chunk.blocks.iter_column(0, 0).enumerate().rev() {
                     if block.id != BlockID::Air {
                         transform.translation = IVec3::new(SPAWN_CHUNK.x * CHUNK_SIZE, chunk_y * CHUNK_SIZE + y as i32 + 2, SPAWN_CHUNK.z * CHUNK_SIZE).as_vec3();
@@ -292,7 +294,8 @@ pub fn move_to_spawn (
                 }
                 continue 'chunks
             }
-            evw_load_chunk.send(LoadChunkEvent { chunk: IVec3::new(SPAWN_CHUNK.x, chunk_y, SPAWN_CHUNK.z), load_reason: LoadReason::Spawning(entity) });
+            evw_load_chunk.send(LoadChunkEvent { chunk: chunk_pos, load_reason: LoadReason::Spawning(entity) });
+            //chunk_status_map.insert(chunk_pos, ChunkStatus::Loading);
             continue 'entity_checks
         }
 

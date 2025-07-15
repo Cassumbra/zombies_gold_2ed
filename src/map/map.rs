@@ -1,7 +1,8 @@
 use std::{collections::VecDeque, fs::File, io::{BufWriter, Write}, ops::{Range, RangeBounds}, time::Instant};
-use bevy::{ecs::event::ManualEventReader, math::Vec3A, prelude::*, render::{self, render_resource::ShaderType}, time::Stopwatch, utils::{HashMap, HashSet}};
+use bevy::{app::AppExit, ecs::event::ManualEventReader, math::Vec3A, prelude::*, render::{self, render_resource::ShaderType}, time::Stopwatch, utils::{HashMap, HashSet}};
 use fastrand::{Rng, choice};
 use flate2::{write::{DeflateEncoder, GzEncoder}, Compression};
+use indexmap::{IndexMap, IndexSet};
 use itertools::{iproduct, Itertools};
 //use grid_tree::OctreeU32;
 use noise::{core::worley::{distance_functions::{self, euclidean, euclidean_squared}, worley_3d, ReturnType}, permutationtable::PermutationTable, Blend, Constant, NoiseFn, Perlin, ScalePoint, Value, Worley};
@@ -29,6 +30,7 @@ impl Plugin for MapPlugin {
             .init_resource::<ChunkLoadingQueue>()
             .init_resource::<ChunkUnloadingQueue>()
             .init_resource::<ChunkSavingQueue>()
+            .init_resource::<ChunkStatusMap>()
             .add_event::<BlockUpdateEvent>()
             .add_event::<LoadChunkEvent>()
             .add_event::<LoadReasonChangeEvent>()
@@ -53,9 +55,13 @@ pub fn generate_chunks (
     mut loader_query: Query<(&mut ChunkLoader)>,
 
     mut loading_queue: ResMut<ChunkLoadingQueue>,
+    mut chunk_status_map: ResMut<ChunkStatusMap>,
+    time: Res<Time>,
 
     //mut next_mapgen_state: ResMut<NextState<MapGenState>>,
 ) {
+    let start = Instant::now();
+
     let gradient = SingleDirectionAxialGradient { values: vec![1.0, 0.0, -0.5], points: vec![-(CHUNK_SIZE) as f64, 0.0, (WORLD_HEIGHT * CHUNK_SIZE) as f64], dimension: 1 };
 
     let noise_gen = Blend::new(ScalePoint::new(Perlin::new(**seed)).set_scale(0.025), gradient, Constant::new(0.7));
@@ -68,7 +74,7 @@ pub fn generate_chunks (
         Constant::new(0.85),
     );
 
-    let mut chunks_to_load = Vec::new();
+    //let mut chunks_to_load = Vec::new();
 
     **loading_queue = VecDeque::from_iter(loading_queue.iter().filter_map(|ev| if !chunk_map.contains_key(&ev.chunk) {Some(*ev)} else {None}));
 
@@ -77,105 +83,113 @@ pub fn generate_chunks (
         if !((-WORLD_SIZE[0]..=WORLD_SIZE[0]).contains(&ev.chunk.x) && (-WORLD_SIZE[1]..=WORLD_SIZE[1]).contains(&ev.chunk.z) && (-WORLD_DEPTH..=WORLD_HEIGHT).contains(&ev.chunk.y)) {
             continue
         }
-
+        // Check to see if this chunk is already in the queue.
+        if *chunk_status_map.get(&ev.chunk).unwrap_or(&ChunkStatus::NonLoaded) == ChunkStatus::Loading {
+            continue
+        }
         // Check if there's already a chunk here.
         if chunk_map.contains_key(&ev.chunk) {
             continue
         }
 
+        // TODO: We should check loadreasons so that we don't end up loading chunks that are just going to get immediately unloaded.
+
+        chunk_status_map.insert(ev.chunk, ChunkStatus::Loading);
         match ev.load_reason {
             LoadReason::Loader(_) => loading_queue.push_front(*ev),
-            LoadReason::Spawning(_) => chunks_to_load.push(*ev),
+            LoadReason::Spawning(_) => loading_queue.push_front(*ev),
         }
     }
 
     // Load only a limited amount of chunks each frame to make things smoother.
-    for _ in 0..4 {
+
+    while start.elapsed().as_millis() < 4 {
         if let Some(ev) = loading_queue.pop_back() {
-            chunks_to_load.push(ev);
-        }
-    }
+            //println!(":3");
+            //println!("loading: {:?}", ev.chunk);
 
-    for ev in chunks_to_load.iter() {
-        //println!("loading: {:?}", ev.chunk);
+            let render_entity = Some(commands.spawn(Transform::from_translation((ev.chunk * CHUNK_SIZE).as_vec3()))
+                                        .insert(GlobalTransform::default())
+                                        .id());
 
-        let render_entity = Some(commands.spawn(Transform::from_translation((ev.chunk * CHUNK_SIZE).as_vec3()))
-                                    .insert(GlobalTransform::default())
-                                    .id());
+            let water_render_entity = Some(commands.spawn(Transform::from_translation((ev.chunk * CHUNK_SIZE).as_vec3()))
+                                        .insert(GlobalTransform::default())
+                                        .id());
 
-        let water_render_entity = Some(commands.spawn(Transform::from_translation((ev.chunk * CHUNK_SIZE).as_vec3()))
-                                    .insert(GlobalTransform::default())
-                                    .id());
+            let mut chunk = Chunk { blocks: Grid3::filled(Block::new(BlockID::Air), [CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE]),
+                                    load_reasons: HashSet::from([ev.load_reason]),
+                                    render_entity,
+                                    water_render_entity
+                                  };
+                              
+            let offset = ev.chunk * CHUNK_SIZE;
 
-        let mut chunk = Chunk { blocks: Grid3::filled(Block::new(BlockID::Air), [CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE]),
-                                load_reasons: HashSet::from([ev.load_reason]),
-                                render_entity,
-                                water_render_entity
-                              };
-    
-        let offset = ev.chunk * CHUNK_SIZE;
+            // Set initial values
+            for (position, block_val) in chunk.blocks.iter_3d_mut() {
+                let point_x = (offset.x + position.x) as f64;
+                let point_y = (offset.y + position.y) as f64;
+                let point_z = (offset.z + position.z) as f64;
+            
+                let noise_val = noise_gen.get([point_x, point_y, point_z]);
+                if noise_val >= 0.0 {
+                    *block_val = Block::new(BlockID::Dirt);
+                    // Make our block grass instead of dirt if the block above is air.
+                    if noise_gen.get([point_x, point_y + 1.0, point_z]) < 0.0 && point_y > 0.0 {
+                        *block_val = Block::new(BlockID::Grass);
 
-        // Set initial values
-        for (position, block_val) in chunk.blocks.iter_3d_mut() {
-            let point_x = (offset.x + position.x) as f64;
-            let point_y = (offset.y + position.y) as f64;
-            let point_z = (offset.z + position.z) as f64;
-    
-            let noise_val = noise_gen.get([point_x, point_y, point_z]);
-            if noise_val >= 0.0 {
-                *block_val = Block::new(BlockID::Dirt);
-                // Make our block grass instead of dirt if the block above is air.
-                if noise_gen.get([point_x, point_y + 1.0, point_z]) < 0.0 && point_y > 0.0 {
-                    *block_val = Block::new(BlockID::Grass);
-
-                    // Tree!
-                    if tree_noise.get([point_x, point_z]) > 0.80 {
-                        evw_gen_tree.send(GenerateTreeEvent(IVec3::new(point_x as i32, point_y as i32 + 1, point_z as i32)));
-                        // TODO: Maybe we want to do this in the tree generation system?
-                        *block_val = Block::new(BlockID::Dirt);
+                        // Tree!
+                        if tree_noise.get([point_x, point_z]) > 0.80 {
+                            evw_gen_tree.send(GenerateTreeEvent(IVec3::new(point_x as i32, point_y as i32 + 1, point_z as i32)));
+                            // TODO: Maybe we want to do this in the tree generation system?
+                            *block_val = Block::new(BlockID::Dirt);
+                        }
+                    }
+                    if (noise_gen.get([point_x, point_y + 5.0, point_z]) > 0.0) || point_y < -5.0 {
+                        *block_val = Block::new(BlockID::Stone);
                     }
                 }
-                if (noise_gen.get([point_x, point_y + 5.0, point_z]) > 0.0) || point_y < -5.0 {
-                    *block_val = Block::new(BlockID::Stone);
+                if point_y < 0.0 && block_val.id == BlockID::Air {
+                    *block_val = Block::new(BlockID::Water)
                 }
             }
-            if point_y < 0.0 && block_val.id == BlockID::Air {
-                *block_val = Block::new(BlockID::Water)
-            }
-        }
 
-        if let Some(pending_chunk) = pending_map.get_mut(&ev.chunk) {
-            for (position, modification) in pending_chunk.iter_3d_mut() {
-                if !modification.yield_to_terrain || chunk.blocks[position].id == BlockID::Air {
-                    chunk.blocks[position] = modification.block;
+            if let Some(pending_chunk) = pending_map.get_mut(&ev.chunk) {
+                for (position, modification) in pending_chunk.iter_3d_mut() {
+                    if !modification.yield_to_terrain || chunk.blocks[position].id == BlockID::Air {
+                        chunk.blocks[position] = modification.block;
+                    }
                 }
             }
-        }
-        
-        if let Some(chunk) = chunk_map.get(&ev.chunk) {
-            if let Some(render_entity) = chunk.render_entity {
-                commands.entity(render_entity).despawn();
-            }
-            if let Some(water_render_entity) = chunk.water_render_entity {
-                commands.entity(water_render_entity).despawn();
-            }
-        }
 
-        chunk_map.insert(ev.chunk, chunk);
-        let loader_entity = match ev.load_reason {
-            LoadReason::Loader(entity) => entity,
-            LoadReason::Spawning(entity) => entity,
-        };
-        if let Ok(mut loader) = loader_query.get_mut(loader_entity) {
-            loader.load_list.push(ev.chunk);
-        }
+            if let Some(chunk) = chunk_map.get(&ev.chunk) {
+                if let Some(render_entity) = chunk.render_entity {
+                    commands.entity(render_entity).despawn();
+                }
+                if let Some(water_render_entity) = chunk.water_render_entity {
+                    commands.entity(water_render_entity).despawn();
+                }
+            }
 
-        evw_update_chunk.send(UpdateChunkEvent(ev.chunk));
-        for adj in ev.chunk.adj_6() {
-            evw_update_chunk.send(UpdateChunkEvent(adj));
+            chunk_map.insert(ev.chunk, chunk);
+            let loader_entity = match ev.load_reason {
+                LoadReason::Loader(entity) => entity,
+                LoadReason::Spawning(entity) => entity,
+            };
+            if let Ok(mut loader) = loader_query.get_mut(loader_entity) {
+                loader.load_list.push(ev.chunk);
+            }
+
+            evw_update_chunk.send(UpdateChunkEvent(ev.chunk));
+            for adj in ev.chunk.adj_6() {
+                evw_update_chunk.send(UpdateChunkEvent(adj));
+            }
+
+            chunk_status_map.insert(ev.chunk, ChunkStatus::Active);
+        }
+        else {
+            break;
         }
     }
-
     //next_mapgen_state.set(MapGenState::TempBand);
 }
 
@@ -322,48 +336,26 @@ pub fn unload_chunks (
 
     mut evr_load_reason: EventReader<LoadReasonChangeEvent>,
 
+    mut chunk_status_map: ResMut<ChunkStatusMap>,
     mut unloading_queue: ResMut<ChunkUnloadingQueue>,
     mut save_queue: ResMut<ChunkSavingQueue>,
 
 ) {
-    **unloading_queue = VecDeque::from_iter(unloading_queue.iter().filter_map(|pos| if chunk_map.contains_key(pos) {Some(*pos)} else {None}));
-
-    /*
-    // Copied from chunk loading section
-    for ev in evr_load_reason.read() {
-        // Ignore chunks that are out of generation scope.
-        //if !((-WORLD_SIZE[0]..=WORLD_SIZE[0]).contains(&ev.x) && (-WORLD_SIZE[1]..=WORLD_SIZE[1]).contains(&ev.z) && (-WORLD_DEPTH..=WORLD_HEIGHT).contains(&ev.y)) {
-        //    continue
-        //}
-
-        // Check if there's already a chunk here.
-        //if chunk_map.contains_key(&ev.chunk) {
-        //    continue
-        //}
-
-        unloading_queue.push_front(ev);
-
-        /*
-        match ev.load_reason {
-            LoadReason::Loader(_) => loading_queue.push_front(*ev),
-            LoadReason::Spawning(_) => chunks_to_load.push(*ev),
-        } */
-    } */
-
     for (ev) in evr_load_reason.read() {
-        //println!("ehehee!!! {:?}", &**ev);
         if let Some(chunk) = chunk_map.get_mut(&**ev) {
-            if chunk.load_reasons.is_empty() {
-                // TODO: could we be sending duplicate save requests into the queue...? need to be careful about this. unsure how.
+            if chunk.load_reasons.is_empty() && *chunk_status_map.get(&**ev).unwrap_or(&ChunkStatus::NonLoaded) != ChunkStatus::Unloading {
                 unloading_queue.push_front(**ev);
-
-
+                chunk_status_map.insert(**ev, ChunkStatus::Unloading);
             }
         }
     }
-
-    for _ in 0..4 {
+    let start = Instant::now();
+    while start.elapsed().as_millis() < 4 {
         if let Some(pos) = unloading_queue.pop_back() {
+            if chunk_map.contains_key(&pos) {
+                continue
+            }
+
             if let Some(chunk) = chunk_map.get_mut(&pos) {
                 if let Some(render_entity) = chunk.render_entity {
                     commands.entity(render_entity).despawn();
@@ -377,28 +369,10 @@ pub fn unload_chunks (
                     e.write(&[block.id as u8, block.damage]).unwrap();
                 }
 
-                //let _ = conn.execute(&format!("INSERT INTO Chunks(PosX, PosY, PosZ, ChunkData) ({}, {}, {}, X'{}') ", pos.x, pos.y, pos.z, hex_string), []);
-                //let _ = conn.execute("INSERT INTO Chunks(PosX, PosY, PosZ, ChunkData) (?1, ?2, ?3, X'?4') ", (pos.x, pos.y, pos.z, hex_string));
-
-                save_queue.push((pos, e.finish().unwrap()));
-                /*
-                match conn.execute(&format!("INSERT INTO Chunks (PosX, PosY, PosZ, ChunkData) VALUES (?1, ?2, ?3, X'{}')
-                                        ON CONFLICT(PosX, PosY, PosZ) DO UPDATE SET ChunkData=excluded.ChunkData;", hex_string), (pos.x, pos.y, pos.z)) {
-                    Ok(updated) => {} //println!("{} rows were updated", updated),
-                    Err(err) => {} //println!("update failed: {}", err),
-                } */
-
-                
-
-                //let f = File::create(format!("saves/1/chunks/x{:}y{:}z{:}.chunk", pos.x.to_string(), pos.y.to_string(), pos.z.to_string())).unwrap();
-                //let mut e = GzEncoder::new(f, Compression::new(1));
-                //for block in chunk_map.get(&pos).unwrap().blocks.iter() {
-                //    e.write(&[block.id as u8, block.damage]).unwrap();
-                //}
-
-                //conn.drop();
+                save_queue.insert(pos, e.finish().unwrap());
 
                 chunk_map.remove(&pos);
+                chunk_status_map.insert(pos, ChunkStatus::PartialSave);
                 //println!("yeet... {:?}", pos);
             }
         }
@@ -410,21 +384,23 @@ pub fn unload_chunks (
 
 pub fn save_chunks (
     mut save_queue: ResMut<ChunkSavingQueue>,
+    //mut exit_evr: EventReader<AppExit>,
 ) {
+    // TODO: Make something that actually works x)
+    /*
+    if !exit_evr.is_empty() {
+        loop {
+            println!("grrr!! i'm evil anger!!");
+        }
+    } */
+
     if save_queue.len() > 1000 {
         let start = Instant::now();
         let conn = Connection::open("saves/1.sl3").unwrap();
         conn.execute("begin", []);
         let mut stmt = conn.prepare("INSERT INTO Chunks (PosX, PosY, PosZ, ChunkData) VALUES (?1, ?2, ?3, ?4)
                                     ON CONFLICT(PosX, PosY, PosZ) DO UPDATE SET ChunkData=excluded.ChunkData;").unwrap();
-        /*
-        for (pos, chunk_data) in save_queue.iter() {
-            match conn.execute("INSERT INTO Chunks (PosX, PosY, PosZ, ChunkData) VALUES (?1, ?2, ?3, ?4)
-                                    ON CONFLICT(PosX, PosY, PosZ) DO UPDATE SET ChunkData=excluded.ChunkData;", (pos.x, pos.y, pos.z, chunk_data)) {
-                Ok(updated) => println!("{} rows were updated", updated),
-                Err(err) => println!("update failed: {}", err),
-            }
-        } */
+
         for (pos, chunk_data) in save_queue.iter() {
             match stmt.execute(params![pos.x, pos.y, pos.z, chunk_data]) {
                 Ok(updated) => {}, //println!("{} rows were updated", updated),
@@ -432,8 +408,6 @@ pub fn save_chunks (
             }
         } 
 
-
-        
         conn.execute("end", []);
         save_queue.clear();
         let duration = start.elapsed();
@@ -527,6 +501,7 @@ pub fn update_chunk_loaders (
     mut query: Query<(Entity, &ChunkPosition, &mut ChunkLoader), (Changed<ChunkPosition>, Without<MoveToSpawn>)>,
 
     mut chunk_map: ResMut<ChunkMap>,
+    mut chunk_status_map: ResMut<ChunkStatusMap>,
 
     mut commands: Commands,
 
@@ -579,10 +554,12 @@ pub fn update_chunk_loaders (
                     loader.load_list.push(*p);
 
                     load_success = true;
+                    //chunk_status_map.insert(*p, ChunkStatus::Loaded);
                 }
             // We keep everything in the range and the buffer range loaded, but we only *start* loading if chunks are in the load range proper.
             if !load_success && (min_corner.x..=max_corner.x).contains(&p.x) && (min_corner.y..=max_corner.y).contains(&p.y) && (min_corner.z..=max_corner.z).contains(&p.z) {
                 evw_load_chunk.send(LoadChunkEvent { chunk: *p, load_reason: LoadReason::Loader(entity) });
+                //chunk_status_map.insert(*p, ChunkStatus::Loading);
             }
         }
     }
@@ -595,7 +572,7 @@ pub struct ChunkLoadingQueue(VecDeque<LoadChunkEvent>);
 pub struct ChunkUnloadingQueue(VecDeque<IVec3>);
 
 #[derive(Default, Clone, Deref, DerefMut, Resource)]
-pub struct ChunkSavingQueue(Vec<(IVec3, Vec<u8>)>);
+pub struct ChunkSavingQueue(IndexMap<IVec3, Vec<u8>>);
 
 #[derive(Clone, Event)]
 pub struct BlockUpdateEvent {
@@ -611,6 +588,20 @@ pub struct LoadChunkEvent {
 
 #[derive(Clone, Copy, Event, Deref, DerefMut, PartialEq, Eq)]
 pub struct LoadReasonChangeEvent(IVec3);
+
+#[derive(Default, Clone, Deref, DerefMut, Resource)]
+pub struct ChunkStatusMap(HashMap<IVec3, ChunkStatus>);
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
+pub enum ChunkStatus {
+    NonLoaded,
+    Loading,
+    // Change from Loaded to Active. Active meaning that the chunk is in memory and able to be interacted with and Loaded meaning that the chunk has load reasons
+    // We already have a system for managing load reasons. So we don't need to track that. Also, we don't need to track if a chunk is active either, but it seems incomplete to not include it? Maybe?
+    Active, //Loaded,
+    Unloading,
+    PartialSave,
+}
 
 //#[derive(Clone, Copy, Event)]
 //pub struct PendingModificationEvent {
@@ -661,6 +652,8 @@ pub enum LoadReason {
     Spawning(Entity), // TODO: Refactor to "move"? or "teleport"? not sure if we should
 }
 
+// CRITICAL!
+// TODO: If we separate load reasons out from here into its own hashmap, then we can ignore entries in the load queue when they have no loadreasons (so that we dont end up loading chunks that are just going to get immediately unloaded)
 #[derive(Clone)]
 pub struct Chunk {
     pub blocks: Grid3<Block>,
