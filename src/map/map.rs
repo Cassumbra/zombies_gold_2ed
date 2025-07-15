@@ -1,5 +1,5 @@
 use std::{collections::VecDeque, fs::File, io::{BufWriter, Write}, ops::{Range, RangeBounds}, time::Instant};
-use bevy::{app::AppExit, ecs::event::ManualEventReader, math::Vec3A, prelude::*, render::{self, render_resource::ShaderType}, time::Stopwatch, utils::{HashMap, HashSet}};
+use bevy::{app::AppExit, ecs::event::ManualEventReader, math::Vec3A, prelude::*, render::{self, render_resource::ShaderType}, time::Stopwatch, utils::{HashMap, HashSet}, window::WindowCloseRequested};
 use fastrand::{Rng, choice};
 use flate2::{write::{DeflateEncoder, GzEncoder}, Compression};
 use indexmap::{IndexMap, IndexSet};
@@ -335,12 +335,14 @@ pub fn unload_chunks (
     mut chunk_map: ResMut<ChunkMap>,
 
     mut evr_load_reason: EventReader<LoadReasonChangeEvent>,
+    close_requested_evr: EventReader<WindowCloseRequested>,
 
     mut chunk_status_map: ResMut<ChunkStatusMap>,
     mut unloading_queue: ResMut<ChunkUnloadingQueue>,
     mut save_queue: ResMut<ChunkSavingQueue>,
 
 ) {
+    let start = Instant::now();
     for (ev) in evr_load_reason.read() {
         if let Some(chunk) = chunk_map.get_mut(&**ev) {
             if chunk.load_reasons.is_empty() && *chunk_status_map.get(&**ev).unwrap_or(&ChunkStatus::NonLoaded) != ChunkStatus::Unloading {
@@ -349,10 +351,17 @@ pub fn unload_chunks (
             }
         }
     }
-    let start = Instant::now();
-    while start.elapsed().as_millis() < 4 {
+
+    if !close_requested_evr.is_empty() {
+        for (pos, _) in chunk_map.iter() {
+            unloading_queue.push_front(*pos)
+        }
+    }
+
+    
+    while start.elapsed().as_millis() < 4 || !close_requested_evr.is_empty() {
         if let Some(pos) = unloading_queue.pop_back() {
-            if chunk_map.contains_key(&pos) {
+            if !chunk_map.contains_key(&pos) {
                 continue
             }
 
@@ -384,17 +393,11 @@ pub fn unload_chunks (
 
 pub fn save_chunks (
     mut save_queue: ResMut<ChunkSavingQueue>,
-    //mut exit_evr: EventReader<AppExit>,
+    close_requested_evr: EventReader<WindowCloseRequested>,
+    mut exit_evw: EventWriter<AppExit>
 ) {
-    // TODO: Make something that actually works x)
-    /*
-    if !exit_evr.is_empty() {
-        loop {
-            println!("grrr!! i'm evil anger!!");
-        }
-    } */
 
-    if save_queue.len() > 1000 {
+    if !close_requested_evr.is_empty() {
         let start = Instant::now();
         let conn = Connection::open("saves/1.sl3").unwrap();
         conn.execute("begin", []);
@@ -412,6 +415,7 @@ pub fn save_chunks (
         save_queue.clear();
         let duration = start.elapsed();
         println!("Time elapsed for upserts: {:?}", duration);
+        exit_evw.send(AppExit);
     }
 }
 
