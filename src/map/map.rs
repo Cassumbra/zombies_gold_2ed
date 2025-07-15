@@ -1,7 +1,7 @@
-use std::{collections::VecDeque, fs::File, io::{BufWriter, Write}, ops::{Range, RangeBounds}, time::Instant};
-use bevy::{app::AppExit, ecs::event::ManualEventReader, math::Vec3A, prelude::*, render::{self, render_resource::ShaderType}, time::Stopwatch, utils::{HashMap, HashSet}, window::WindowCloseRequested};
+use std::{collections::VecDeque, fs::File, io::{BufWriter, Read, Write}, ops::{Range, RangeBounds}, time::Instant};
+use bevy::{app::AppExit, ecs::event::ManualEventReader, math::Vec3A, prelude::*, render::{self, render_resource::ShaderType}, time::Stopwatch, utils::{petgraph::data, HashMap, HashSet}, window::WindowCloseRequested};
 use fastrand::{Rng, choice};
-use flate2::{write::{DeflateEncoder, GzEncoder}, Compression};
+use flate2::{bufread::DeflateDecoder, write::{DeflateEncoder, GzEncoder}, Compression};
 use indexmap::{IndexMap, IndexSet};
 use itertools::{iproduct, Itertools};
 //use grid_tree::OctreeU32;
@@ -54,6 +54,7 @@ pub fn generate_chunks (
 
     mut loader_query: Query<(&mut ChunkLoader)>,
 
+    mut partial_save_map: ResMut<ChunkSavingQueue>,
     mut loading_queue: ResMut<ChunkLoadingQueue>,
     mut chunk_status_map: ResMut<ChunkStatusMap>,
     time: Res<Time>,
@@ -102,12 +103,11 @@ pub fn generate_chunks (
     }
 
     // Load only a limited amount of chunks each frame to make things smoother.
-
+    let conn = Connection::open("saves/1.sl3").unwrap();
     while start.elapsed().as_millis() < 4 {
         if let Some(ev) = loading_queue.pop_back() {
             //println!(":3");
             //println!("loading: {:?}", ev.chunk);
-
             let render_entity = Some(commands.spawn(Transform::from_translation((ev.chunk * CHUNK_SIZE).as_vec3()))
                                         .insert(GlobalTransform::default())
                                         .id());
@@ -121,45 +121,97 @@ pub fn generate_chunks (
                                     render_entity,
                                     water_render_entity
                                   };
-                              
-            let offset = ev.chunk * CHUNK_SIZE;
+                                      
+            let potential_compressed_chunk: Option<Vec<u8>> =
+            if let Some(data) = partial_save_map.get(&ev.chunk) {
+                Some(data.clone())
+            }
+            else if let Ok(data) = conn.query_one("SELECT ChunkData FROM Chunks WHERE PosX=?1 AND PosY=?2 AND PosZ=?3", [ev.chunk.x, ev.chunk.y, ev.chunk.z], |row| row.get(0)){
+                Some(data)
+            }
+            else {
+                None
+            };
 
-            // Set initial values
-            for (position, block_val) in chunk.blocks.iter_3d_mut() {
-                let point_x = (offset.x + position.x) as f64;
-                let point_y = (offset.y + position.y) as f64;
-                let point_z = (offset.z + position.z) as f64;
-            
-                let noise_val = noise_gen.get([point_x, point_y, point_z]);
-                if noise_val >= 0.0 {
-                    *block_val = Block::new(BlockID::Dirt);
-                    // Make our block grass instead of dirt if the block above is air.
-                    if noise_gen.get([point_x, point_y + 1.0, point_z]) < 0.0 && point_y > 0.0 {
-                        *block_val = Block::new(BlockID::Grass);
+            if let Some(compressed_chunk) = potential_compressed_chunk {
+                
+                let mut d = DeflateDecoder::new(&*compressed_chunk);
+                let mut chunk_data: [u8; CHUNK_SIZE.pow(3) as usize * 2] = [0; CHUNK_SIZE.pow(3) as usize * 2];
+                let result_bytes_read = d.read(&mut chunk_data);
+                match result_bytes_read {
+                    Ok(bytes_read) => {} //println!("bytes read: {}", bytes_read),
+                    Err(err) => {} //println!("update failed: {}", err),
+                }
+                let mut i = 0;
+                let mut chunk_data_iter = chunk_data.iter();
+                while i < CHUNK_SIZE.pow(3) as usize {
+                    if let Some((id, damage)) = chunk_data_iter.next_tuple() {
+                        chunk.blocks.data[i].id = BlockID::from_u8(*id);
+                        chunk.blocks.data[i].damage = *damage;
+                        //println!("{}, {}", id, i);
+                        i += 1;
+                    }
+                    else {
+                        break;
+                    }
+                }
+                /*
+                while let Some((id, damage)) = chunk_data.iter().next_tuple() {
+                    chunk.blocks.data[i].id = BlockID::from_u8(*id);
+                    chunk.blocks.data[i].damage = *damage;
+                    //println!("{}, {}", id, i);
+                    i += 1;
+                    if i == CHUNK_SIZE.pow(3) as usize {
+                        break
+                    }
+                } */
 
-                        // Tree!
-                        if tree_noise.get([point_x, point_z]) > 0.80 {
-                            evw_gen_tree.send(GenerateTreeEvent(IVec3::new(point_x as i32, point_y as i32 + 1, point_z as i32)));
-                            // TODO: Maybe we want to do this in the tree generation system?
-                            *block_val = Block::new(BlockID::Dirt);
+                //todo!("{:?}", chunk_data)
+            }
+            else {
+                
+                                  
+                let offset = ev.chunk * CHUNK_SIZE;
+
+                // Set initial values
+                for (position, block_val) in chunk.blocks.iter_3d_mut() {
+                    let point_x = (offset.x + position.x) as f64;
+                    let point_y = (offset.y + position.y) as f64;
+                    let point_z = (offset.z + position.z) as f64;
+                
+                    let noise_val = noise_gen.get([point_x, point_y, point_z]);
+                    if noise_val >= 0.0 {
+                        *block_val = Block::new(BlockID::Dirt);
+                        // Make our block grass instead of dirt if the block above is air.
+                        if noise_gen.get([point_x, point_y + 1.0, point_z]) < 0.0 && point_y > 0.0 {
+                            *block_val = Block::new(BlockID::Grass);
+
+                            // Tree!
+                            if tree_noise.get([point_x, point_z]) > 0.80 {
+                                evw_gen_tree.send(GenerateTreeEvent(IVec3::new(point_x as i32, point_y as i32 + 1, point_z as i32)));
+                                // TODO: Maybe we want to do this in the tree generation system?
+                                *block_val = Block::new(BlockID::Dirt);
+                            }
+                        }
+                        if (noise_gen.get([point_x, point_y + 5.0, point_z]) > 0.0) || point_y < -5.0 {
+                            *block_val = Block::new(BlockID::Stone);
                         }
                     }
-                    if (noise_gen.get([point_x, point_y + 5.0, point_z]) > 0.0) || point_y < -5.0 {
-                        *block_val = Block::new(BlockID::Stone);
+                    if point_y < 0.0 && block_val.id == BlockID::Air {
+                        *block_val = Block::new(BlockID::Water)
                     }
                 }
-                if point_y < 0.0 && block_val.id == BlockID::Air {
-                    *block_val = Block::new(BlockID::Water)
+
+                if let Some(pending_chunk) = pending_map.get_mut(&ev.chunk) {
+                    for (position, modification) in pending_chunk.iter_3d_mut() {
+                        if !modification.yield_to_terrain || chunk.blocks[position].id == BlockID::Air {
+                            chunk.blocks[position] = modification.block;
+                        }
+                    }
                 }
             }
 
-            if let Some(pending_chunk) = pending_map.get_mut(&ev.chunk) {
-                for (position, modification) in pending_chunk.iter_3d_mut() {
-                    if !modification.yield_to_terrain || chunk.blocks[position].id == BlockID::Air {
-                        chunk.blocks[position] = modification.block;
-                    }
-                }
-            }
+
 
             if let Some(chunk) = chunk_map.get(&ev.chunk) {
                 if let Some(render_entity) = chunk.render_entity {
@@ -714,6 +766,20 @@ impl BlockID {
 
     fn get_default_data(self) -> [BlockData; 1] {
         todo!()
+    }
+
+    pub fn from_u8(num: u8) -> Self {
+        match num {
+            0 => BlockID::Air,
+            1 => BlockID::Dirt,
+            2 => BlockID::Grass,
+            3 => BlockID::Stone,
+            4 => BlockID::StoneBrick,
+            5 => BlockID::Log,
+            6 => BlockID::Leaves,
+            7 => BlockID::Water,
+            _ => todo!("Requested unassigned blockID!"),
+        }
     }
 }
 

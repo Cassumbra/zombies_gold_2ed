@@ -10,7 +10,7 @@ use crate::point::{GridPoint, Size3d};
 /// A dense sized 3D grid that stores it's elements in a `Vec`.
 #[derive(Debug, Clone, Eq, PartialEq, Reflect)]
 pub struct Grid3<T> {
-    data: Vec<T>,
+    pub data: Vec<T>,
     size: UVec3,
 }
 
