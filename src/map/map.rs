@@ -1,5 +1,5 @@
 use std::{collections::VecDeque, fs::File, io::{BufWriter, Read, Write}, ops::{Range, RangeBounds}, time::Instant};
-use bevy::{app::AppExit, ecs::event::ManualEventReader, math::Vec3A, prelude::*, render::{self, render_resource::ShaderType}, time::Stopwatch, utils::{petgraph::data, HashMap, HashSet}, window::WindowCloseRequested};
+use bevy::{app::AppExit, ecs::event::ManualEventReader, math::{DVec3, Vec3A}, prelude::*, render::{self, render_resource::ShaderType}, time::Stopwatch, utils::{petgraph::data, HashMap, HashSet}, window::WindowCloseRequested};
 use fastrand::{Rng, choice};
 use flate2::{bufread::DeflateDecoder, write::{DeflateEncoder, GzEncoder}, Compression};
 use indexmap::{IndexMap, IndexSet};
@@ -54,10 +54,10 @@ pub fn generate_chunks (
 
     mut loader_query: Query<(&mut ChunkLoader)>,
 
-    mut partial_save_map: ResMut<ChunkSavingQueue>,
+    partial_save_map: Res<ChunkSavingQueue>,
     mut loading_queue: ResMut<ChunkLoadingQueue>,
     mut chunk_status_map: ResMut<ChunkStatusMap>,
-    time: Res<Time>,
+    //time: Res<Time>,
 
     //mut next_mapgen_state: ResMut<NextState<MapGenState>>,
 ) {
@@ -156,36 +156,88 @@ pub fn generate_chunks (
                 
                                   
                 let offset = ev.chunk * CHUNK_SIZE;
-
-                // Set initial values
-                for (position, block_val) in chunk.blocks.iter_3d_mut() {
-                    let point_x = (offset.x + position.x) as f64;
-                    let point_y = (offset.y + position.y) as f64;
-                    let point_z = (offset.z + position.z) as f64;
+                let mut set_block_val = |position: IVec3, block_val: &mut Block| {
+                    let point = DVec3::from(offset + position);
                 
-                    let noise_val = noise_gen.get([point_x, point_y, point_z]);
+                    let noise_val = noise_gen.get([point.x, point.y, point.z]);
                     if noise_val >= 0.0 {
                         *block_val = Block::new(BlockID::Dirt);
                         // Make our block grass instead of dirt if the block above is air.
-                        if noise_gen.get([point_x, point_y + 1.0, point_z]) < 0.0 && point_y > 0.0 {
+                        if noise_gen.get([point.x, point.y + 1.0, point.z]) < 0.0 && point.y > 0.0 {
                             *block_val = Block::new(BlockID::Grass);
 
                             // Tree!
-                            if tree_noise.get([point_x, point_z]) > 0.80 {
-                                evw_gen_tree.send(GenerateTreeEvent(IVec3::new(point_x as i32, point_y as i32 + 1, point_z as i32)));
+                            if tree_noise.get([point.x, point.z]) > 0.80 {
+                                evw_gen_tree.send(GenerateTreeEvent(IVec3::new(point.x as i32, point.y as i32 + 1, point.z as i32)));
                                 // TODO: Maybe we want to do this in the tree generation system?
                                 *block_val = Block::new(BlockID::Dirt);
                             }
                         }
-                        if (noise_gen.get([point_x, point_y + 5.0, point_z]) > 0.0) || point_y < -5.0 {
+                        if (noise_gen.get([point.x, point.y + 5.0, point.z]) > 0.0) || point.y < -5.0 {
                             *block_val = Block::new(BlockID::Stone);
                         }
                     }
-                    if point_y < 0.0 && block_val.id == BlockID::Air {
+                    if point.y < 0.0 && block_val.id == BlockID::Air {
                         *block_val = Block::new(BlockID::Water)
+                    }
+                };
+
+                let mut all_air = true;
+                let mut all_stone = true;
+                for (position, block_val) in chunk.blocks.iter_3d_mut() {
+                    // TODO: If this works, lets get some compile-time list we can use to iterate over. that would be much faster. (probably)
+                    if position.max_element() == CHUNK_SIZE - 1 || position.min_element() == 0 {
+                        set_block_val(position, block_val);
+                        if block_val.id != BlockID::Air {
+                            all_air = false;
+                        }
+                        if block_val.id != BlockID::Stone {
+                            all_stone = false
+                        }
                     }
                 }
 
+                if !(all_air || all_stone) {
+                    // TODO: If this works, lets get some compile-time list we can use to iterate over. that would be much faster. (probably)
+                    for (position, block_val) in chunk.blocks.iter_3d_mut() {
+                        if position.max_element() != CHUNK_SIZE - 1 || position.min_element() != 0 {
+                            set_block_val(position, block_val);
+                        }
+                    }
+                }
+
+                if all_stone {
+                    chunk.blocks = Grid3::filled(Block::new(BlockID::Stone), [CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE]);
+                }
+
+                // Set initial values
+                /*
+                for (position, block_val) in chunk.blocks.iter_3d_mut() {
+                    let point = DVec3::from(offset + position);
+                
+                    let noise_val = noise_gen.get([point.x, point.y, point.z]);
+                    if noise_val >= 0.0 {
+                        *block_val = Block::new(BlockID::Dirt);
+                        // Make our block grass instead of dirt if the block above is air.
+                        if noise_gen.get([point.x, point.y + 1.0, point.z]) < 0.0 && point.y > 0.0 {
+                            *block_val = Block::new(BlockID::Grass);
+
+                            // Tree!
+                            if tree_noise.get([point.x, point.z]) > 0.80 {
+                                evw_gen_tree.send(GenerateTreeEvent(IVec3::new(point.x as i32, point.y as i32 + 1, point.z as i32)));
+                                // TODO: Maybe we want to do this in the tree generation system?
+                                *block_val = Block::new(BlockID::Dirt);
+                            }
+                        }
+                        if (noise_gen.get([point.x, point.y + 5.0, point.z]) > 0.0) || point.y < -5.0 {
+                            *block_val = Block::new(BlockID::Stone);
+                        }
+                    }
+                    if point.y < 0.0 && block_val.id == BlockID::Air {
+                        *block_val = Block::new(BlockID::Water)
+                    }
+                }
+                */
                 if let Some(pending_chunk) = pending_map.get_mut(&ev.chunk) {
                     for (position, modification) in pending_chunk.iter_3d_mut() {
                         if !modification.yield_to_terrain || chunk.blocks[position].id == BlockID::Air {
@@ -412,7 +464,7 @@ pub fn unload_chunks (
                     commands.entity(water_render_entity).despawn();
                 }
 
-                let mut e = DeflateEncoder::new(Vec::new(), Compression::default());
+                let mut e = DeflateEncoder::new(Vec::new(), Compression::fast());
                 for block in chunk_map.get(&pos).unwrap().blocks.iter() {
                     e.write(&[block.id as u8, block.damage]).unwrap();
                 }
