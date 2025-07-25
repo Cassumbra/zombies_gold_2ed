@@ -25,7 +25,7 @@ derive_more = "0.99.17"
 block-mesh = "0.2.0"
 #bevy_flycam = {path = "../!_Local-Plugins/bevy_flycam"}
 image = "0.24"
-flate2 = "1.1.2"
+flate2 = {version = "1.1.2", features = ["zlib-rs"], default-features = false }
 rusqlite = { version = "0.37.0", features = ["bundled"] }
 #hex = "0.4.3"
 indexmap = "2.10.0"

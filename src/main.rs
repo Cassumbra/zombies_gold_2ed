@@ -12,7 +12,7 @@
 
 use std::collections::BTreeMap;
 
-use bevy::{app::AppExit, ecs::schedule::ScheduleLabel, pbr::wireframe::WireframePlugin, prelude::*, render::{camera::RenderTarget, render_resource::{Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages}, texture::{ImageFilterMode, ImageSampler, ImageSamplerDescriptor}, Render, RenderSet}, utils::HashMap, window::WindowResolution};
+use bevy::{app::AppExit, ecs::schedule::ScheduleLabel, log::LogPlugin, pbr::wireframe::WireframePlugin, prelude::*, render::{camera::RenderTarget, render_resource::{Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages}, texture::{ImageFilterMode, ImageSampler, ImageSamplerDescriptor}, Render, RenderSet}, utils::HashMap, window::WindowResolution};
 use bevy::transform::TransformSystem::TransformPropagate;
 use bevy_asset_loader::prelude::*;
 //use bevy_mod_mipmap_generator::{generate_mipmaps, MipmapGeneratorPlugin, MipmapGeneratorSettings};
@@ -145,6 +145,9 @@ fn main () {
                 ..default()
             }),
             close_when_requested: false,
+            ..default()
+        }).set(LogPlugin {
+            filter: "wgpu=error,naga=warn".into(), //,bevy_ecs=debug
             ..default()
         })
         .set(ImagePlugin { default_sampler })

@@ -1,7 +1,7 @@
 use std::{collections::VecDeque, fs::File, io::{BufWriter, Read, Write}, ops::{Range, RangeBounds}, time::Instant};
-use bevy::{app::AppExit, ecs::event::ManualEventReader, math::{DVec3, Vec3A}, prelude::*, render::{self, render_resource::ShaderType}, time::Stopwatch, utils::{petgraph::data, HashMap, HashSet}, window::WindowCloseRequested};
+use bevy::{app::AppExit, ecs::event::ManualEventReader, math::{DVec3, Vec3A}, prelude::*, render::{self, render_resource::ShaderType}, tasks::{ComputeTaskPool, ParallelSliceMut}, time::Stopwatch, utils::{petgraph::data, HashMap, HashSet}, window::WindowCloseRequested};
 use fastrand::{Rng, choice};
-use flate2::{bufread::DeflateDecoder, write::{DeflateEncoder, GzEncoder}, Compression};
+use flate2::{bufread::{DeflateDecoder, GzDecoder}, write::{DeflateEncoder, GzEncoder, ZlibEncoder}, Compression};
 use indexmap::{IndexMap, IndexSet};
 use itertools::{iproduct, Itertools};
 //use grid_tree::OctreeU32;
@@ -144,7 +144,7 @@ pub fn generate_chunks (
 
             if let Some(compressed_chunk) = potential_compressed_chunk {
                 
-                let mut d = DeflateDecoder::new(&*compressed_chunk);
+                let mut d = GzDecoder::new(&*compressed_chunk);
                 let mut chunk_data: [u8; CHUNK_SIZE.pow(3) as usize * 2] = [0; CHUNK_SIZE.pow(3) as usize * 2];
                 let result_bytes_read = d.read(&mut chunk_data);
                 match result_bytes_read {
@@ -431,8 +431,61 @@ pub fn unload_chunks (
             unloading_queue.push_front(*pos)
         }
     }
-
     
+    let mut i = 0;
+    let compressed_chunks: Vec<(Vec<u8>, IVec3)> = ComputeTaskPool::get().scope(|scope| {
+        while i != 4 || !close_requested_evr.is_empty() {
+            i += 1;
+            if let Some(pos) = unloading_queue.pop_back() {
+                if !chunk_map.contains_key(&pos) {
+                    continue
+                }
+                if let Some(chunk) = chunk_map.get(&pos) {
+                    // WARN: This effectively suppresses a B0003 warning by not attempting to despawn in situations that might cause that issue.
+                    //       The warning may be indicative of a larger issue, so if we notice something strange happening with chunk loading/unloading, look here.
+                    if close_requested_evr.is_empty() {
+                        if let Some(render_entity) = chunk.render_entity {
+                            commands.entity(render_entity).despawn();
+                        }
+                        if let Some(water_render_entity) = chunk.water_render_entity {
+                            commands.entity(water_render_entity).despawn();
+                        }
+                    }
+                    
+
+                    scope.spawn(async move {
+                        //let start_encode = Instant::now();
+                        let mut e = GzEncoder::new(Vec::new(), Compression::fast());
+                        for block in chunk.blocks.iter() {
+                            e.write(&[block.id as u8, block.damage]).unwrap();
+                        }
+                        //println!("time to encode: {:?}", start_encode.elapsed());
+
+                        (match e.finish() {
+                            Ok(data) => data,
+                            Err(_) => todo!(),
+                        }, pos)
+                    });
+                    
+
+                    
+                    //println!("yeet... {:?}", pos);
+                }
+            }
+            else {
+                break;
+            }
+        }
+        
+    });
+
+    for (chunk, pos) in compressed_chunks {
+        save_queue.insert(pos, chunk);
+        //println!("{}", chunk_map.remove(&pos).is_some());
+        chunk_map.remove(&pos);
+        chunk_status_map.insert(pos, ChunkStatus::PartialSave);
+    }
+    /*
     while start.elapsed().as_millis() < 1 || !close_requested_evr.is_empty() {
         if let Some(pos) = unloading_queue.pop_back() {
             if !chunk_map.contains_key(&pos) {
@@ -447,10 +500,12 @@ pub fn unload_chunks (
                     commands.entity(water_render_entity).despawn();
                 }
 
-                let mut e = DeflateEncoder::new(Vec::new(), Compression::fast());
+                let start_encode = Instant::now();
+                let mut e = GzEncoder::new(Vec::new(), Compression::fast());
                 for block in chunk_map.get(&pos).unwrap().blocks.iter() {
                     e.write(&[block.id as u8, block.damage]).unwrap();
                 }
+                println!("time to encode: {:?}", start_encode.elapsed());
 
                 save_queue.insert(pos, e.finish().unwrap());
 
@@ -462,7 +517,7 @@ pub fn unload_chunks (
         else {
             break;
         }
-    }
+    } */
 }
 
 pub fn save_chunks (
@@ -762,7 +817,7 @@ pub enum LoadReason {
 
 // CRITICAL!
 // TODO: If we separate load reasons out from here into its own hashmap, then we can ignore entries in the load queue when they have no loadreasons (so that we dont end up loading chunks that are just going to get immediately unloaded)
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Chunk {
     pub blocks: Grid3<Block>,
     pub load_reasons: HashSet<LoadReason>,
@@ -772,7 +827,7 @@ pub struct Chunk {
 
 
 // TODO: Optimization: If we're using too much space, we can try and use u8s instead of enums. :)
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone, Copy, Debug)]
 pub struct Block {
     pub id: BlockID,
     pub damage: u8,
