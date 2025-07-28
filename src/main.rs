@@ -207,6 +207,8 @@ fn main () {
 
     .add_plugins(ActionsPlugin)
     .add_plugins(MapPlugin)
+    .add_plugins(StatsPlugin)
+    .add_plugins(MechanicsPlugin)
 
     .init_resource::<RNGSeed>()
 
@@ -239,8 +241,11 @@ fn main () {
     .add_systems(Update, building)
     .add_systems(Update, place_block)
     .add_systems(Update, process_block_updates)
-    .add_systems(Update, handle_breath)
-    
+    .add_systems(Update, mechanics::handle_breath)
+    .add_systems(Update, mechanics::handle_suffocation)
+    .add_systems(Update, mechanics::handle_death)
+    .add_systems(Update, stats::do_stat_change)
+
     .add_systems(Update, player_input_game)
     
     .add_systems(
@@ -287,7 +292,7 @@ pub fn move_to_spawn (
     mut commands: Commands,
 
     mut evw_load_chunk: EventWriter<LoadChunkEvent>,
-    mut chunk_status_map: ResMut<ChunkStatusMap>,
+    //mut chunk_status_map: ResMut<ChunkStatusMap>,
 ) {
     //println!("time to move arounda!");
     'entity_checks: for (entity, mut transform) in &mut query {

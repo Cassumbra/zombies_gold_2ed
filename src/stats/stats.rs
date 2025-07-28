@@ -2,6 +2,17 @@ use std::collections::BTreeMap;
 
 use bevy::{prelude::*, utils::HashMap};
 
+pub struct StatsPlugin;
+
+impl Plugin for StatsPlugin {
+    fn build(&self, app: &mut App) {
+        app
+        .add_event::<StatChangeEvent>();
+    }
+}
+
+
+
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Reflect, Hash)]
 pub enum StatType {
@@ -27,8 +38,7 @@ impl Stat {
 }
 
 // Components
-#[derive(Component, Default, Clone, Reflect, Deref, DerefMut)]
-#[reflect(Component)]
+#[derive(Component, Default, Clone, Deref, DerefMut)]
 pub struct Stats(pub HashMap<StatType, Stat>);
 impl Stats {
     pub fn get_base (&self, stat: &StatType) -> f32 {
@@ -67,5 +77,34 @@ impl Stats {
 
     pub fn in_range (&self, stat: &StatType, value: f32) -> bool {
         value <= self.0[stat].max && value >= self.0[stat].min
+    }
+}
+
+//Events
+#[derive(Clone, Copy, Event)]
+pub struct StatChangeEvent {
+    pub stat: StatType,
+    pub amount: f32,
+    pub entity: Entity,
+}
+impl StatChangeEvent {
+    pub fn new(stat: StatType, amount: f32, entity: Entity) -> Self {
+        StatChangeEvent {stat, amount, entity}
+    }
+}
+
+//Systems
+pub fn do_stat_change (
+    mut evr_stat_change: EventReader<StatChangeEvent>,
+
+    mut stats_query: Query<&mut Stats>,
+) {
+    for ev in evr_stat_change.read() {
+        if let Ok(mut stats) = stats_query.get_mut(ev.entity) {
+            //println!("stat type: {}", ev.stat);
+            stats.get_mut(&ev.stat).unwrap().base += ev.amount;
+            
+            stats.get_mut(&ev.stat).unwrap().base = stats.get_base(&ev.stat).clamp(stats.get_min(&ev.stat), stats.get_max(&ev.stat));
+        }
     }
 }
