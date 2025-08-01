@@ -1,7 +1,9 @@
+use std::cmp::min;
+
 use bevy::{a11y::AccessibilityNode, prelude::*};
 use iyes_perf_ui::PerfUiCompleteBundle;
 
-use crate::{Atlas, BuildingEvent, BuildingTimer, HasAir, Inventory, ItemID, MiningEvent, MiningTimer, Player, StatType, Stats};
+use crate::{Atlas, BuildingEvent, BuildingTimer, HasAir, Inventory, ItemID, MiningEvent, MiningTimer, Player, StatChangeEvent, StatType, Stats};
 
 
 pub fn setup_ui (
@@ -143,7 +145,7 @@ pub fn setup_ui (
             },
 
             ..default()
-        }).with_children(|parent| {
+        }).insert(HealthBarRoot).with_children(|parent| {
             for _ in 0..=3 {
                 parent.spawn(ImageBundle {
                     style: Style {
@@ -155,7 +157,8 @@ pub fn setup_ui (
                     ..default()
                     },
                     )
-                    .insert(TextureAtlas{ layout: atlas.ui_16x16_layout.clone(), index: 19 as usize});
+                    .insert(TextureAtlas{ layout: atlas.ui_16x16_layout.clone(), index: 19 as usize})
+                    .insert(HealthDisplay);
             }
         });
 
@@ -321,6 +324,61 @@ pub fn update_resource_counts (
     }
 }
 
+pub fn update_health_bar (
+    mut commands: Commands,
+
+    player_query: Query<&Stats, With<Player>>,
+
+    //inventory_query: Query<(&Inventory), (With<Player>, Changed<Inventory>)>,
+    root_query: Query<(Entity), With<HealthBarRoot>>,
+    health_display_query: Query<(Entity), With<HealthDisplay>>,
+
+    atlas: Res<Atlas>,
+
+    mut evr_stat_change: EventReader<StatChangeEvent>,
+) {
+    for ev in evr_stat_change.read() {
+        if ev.stat == StatType::Health {
+            if let Ok(stats) = player_query.get(ev.entity) {
+                if let Ok(root) = root_query.get_single() {
+                    for entity in &health_display_query {
+                        commands.entity(entity).despawn_recursive();
+                    }
+                    let mut remaining_health = stats.get_base(&StatType::Health);
+                    for _ in 0..(stats.get_max(&StatType::Health)/4.0).ceil() as i32 {
+                        // TODO: Make this some sort of constant
+                        let base_index = 19;
+                        let index = base_index + (4 - min(remaining_health as usize, 4));
+
+                        let health_display_unit = commands.spawn(ImageBundle {
+                                style: Style {
+                                    width: Val::Px(64.),
+                                    height: Val::Px(64.),
+                                    ..default()
+                                },
+                                image: UiImage::new(atlas.ui_16x16.clone()),
+                                ..default()
+                                },
+                                )
+                            .insert(TextureAtlas{ layout: atlas.ui_16x16_layout.clone(), index})
+                            .insert(HealthDisplay)
+                            .id();
+
+                        commands.entity(root).add_child(health_display_unit);
+
+                        remaining_health -= 4.0;
+                        if remaining_health < 0.0 {remaining_health = 0.0};
+                    }
+                }
+                break
+            }
+        }
+        
+    }
+}
+
+
+
 const PROGRESS_BAR_SMOOTHNESS: f32 = 12.0;
 
 pub fn update_progress_bar (
@@ -380,6 +438,14 @@ pub struct ItemDisplay(ItemID);
 #[derive(Component, Clone, Debug, Reflect)]
 #[reflect(Component)]
 pub struct HotBarRoot;
+
+#[derive(Component, Clone, Debug, Reflect)]
+#[reflect(Component)]
+pub struct HealthBarRoot;
+
+#[derive(Component, Clone, Debug, Reflect)]
+#[reflect(Component)]
+pub struct HealthDisplay;
 
 #[derive(Component, Clone, Debug, Reflect)]
 #[reflect(Component)]
