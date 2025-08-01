@@ -10,7 +10,7 @@
 
 //use std::f32::consts::PI;
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, thread, time::Duration};
 
 use bevy::{app::AppExit, ecs::schedule::ScheduleLabel, log::LogPlugin, pbr::wireframe::WireframePlugin, prelude::*, render::{camera::RenderTarget, render_resource::{Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages}, texture::{ImageFilterMode, ImageSampler, ImageSamplerDescriptor}, Render, RenderSet}, utils::HashMap, window::WindowResolution};
 use bevy::transform::TransformSystem::TransformPropagate;
@@ -205,6 +205,7 @@ fn main () {
 
     //.add_plugins(PlayerPlugin)
 
+    .add_plugins(PhysicsPlugin)
     .add_plugins(ActionsPlugin)
     .add_plugins(MapPlugin)
     .add_plugins(StatsPlugin)
@@ -243,6 +244,7 @@ fn main () {
     .add_systems(Update, process_block_updates)
     .add_systems(Update, mechanics::handle_breath)
     .add_systems(Update, mechanics::handle_suffocation)
+    .add_systems(Update, mechanics::handle_fall_damage)
     .add_systems(Update, mechanics::handle_death)
     .add_systems(Update, stats::do_stat_change)
 
@@ -451,6 +453,7 @@ pub fn setup (
             9.0,
             6.0,
         ),
+        DistanceBeforeCollision::default(),
         LinearVelocity::default(),
         Gravity(14.0),
         Player,

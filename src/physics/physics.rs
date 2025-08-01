@@ -5,6 +5,28 @@ use crate::{block_pos_from_global, chunk_pos_from_global, BlockID, Chunk, ChunkM
 
 pub const BLOCK_AABB: AabbCollider = AabbCollider{ width: 1.0, height: 1.0, length: 1.0 };
 
+pub struct PhysicsPlugin;
+
+impl Plugin for PhysicsPlugin {
+    fn build(&self, app: &mut App) {
+        app
+        .add_event::<FallEvent>();
+    }
+}
+
+//Events
+#[derive(Clone, Copy, Event)]
+pub struct FallEvent {
+    pub distance: f32,
+    pub entity: Entity,
+}
+impl FallEvent {
+    pub fn new(distance: f32, entity: Entity) -> Self {
+        FallEvent {distance, entity}
+    }
+}
+
+
 pub fn apply_gravity (
     //mut commands: Commands,
 
@@ -22,13 +44,31 @@ pub fn apply_gravity (
 pub fn do_physics (
     mut commands: Commands,
 
-    mut query: Query<(Entity, &mut Transform, &mut LinearVelocity, Option<&AabbCollider>, Option<&mut HasAir>)>,
+    mut query: Query<(Entity, &mut Transform, &mut LinearVelocity, &mut DistanceBeforeCollision, Option<&AabbCollider>, Option<&mut HasAir>)>,
 
     time: Res<Time>,
     chunk_map: Res<ChunkMap>,
-
+    mut evr_fall: EventWriter<FallEvent>,
 ) {
-    for (entity, mut transform, mut velocity, opt_collider, mut opt_has_air) in &mut query {
+    let dist_bf_collision_calc = |dist_bf_collision: Vec3, distance: Vec3| -> Vec3 {
+        let mut dbfc = dist_bf_collision;
+
+        for i in 0..=2 {
+            if dbfc[i] == 0.0 {
+                dbfc[i] += distance[i];
+            }
+            else if dbfc[i].signum() != distance[i].signum() {
+                dbfc[i] = 0.0;
+            }
+            else {// dbfc[i] == 0.0 {
+               dbfc[i] += distance[i]; 
+            }
+        }
+        //println!("heheheha: {}", dbfc);
+        dbfc
+    };
+
+    for (entity, mut transform, mut velocity, mut dist_bf_collision, opt_collider, mut opt_has_air) in &mut query {
         let frame_velocity = **velocity * time.delta_seconds();
 
         if let Some(collider) = opt_collider {
@@ -49,6 +89,7 @@ pub fn do_physics (
                 let frame_velocity = **velocity * time.delta_seconds();
                 let step_velocity = frame_velocity / step_count as f32;
                 transform.translation += step_velocity;
+                **dist_bf_collision = dist_bf_collision_calc(**dist_bf_collision, step_velocity);
 
                 let mut collisions: Vec<BlockCollision> = iproduct!((transform.translation.x - collider.width.ceil()) as i32..=(transform.translation.x + collider.width.ceil()) as i32, 
                                                                 (transform.translation.y - collider.height.ceil()) as i32..=(transform.translation.y + collider.height.ceil()) as i32,
@@ -67,6 +108,7 @@ pub fn do_physics (
                             },
                             Solidity::NonSolid => {},
                             Solidity::Water => {
+                                **dist_bf_collision = Vec3::ZERO;
                                 let mut top_box = *collider;
                                 top_box.height /= 2.0;
                                 let mut top_box_pos = transform.translation;
@@ -111,6 +153,7 @@ pub fn do_physics (
                         //    println!("Penetration: {}, Normal: {}", penetration, normal);
                         //}
                         transform.translation += penetration * normal;
+                        **dist_bf_collision += penetration * normal;
                         
                         for i in 0..=2 {
                             let mut surface_contact = SurfaceContact::NegX;
@@ -120,9 +163,18 @@ pub fn do_physics (
                                 
 
                                 match i {
-                                    0 => surface_contact = SurfaceContact::NegX,
-                                    1 => surface_contact = SurfaceContact::NegY,
-                                    2 => surface_contact = SurfaceContact::NegZ,
+                                    0 => {
+                                            dist_bf_collision.x = 0.0;
+                                            surface_contact = SurfaceContact::NegX;
+                                         }
+                                    1 => {
+                                            dist_bf_collision.y = 0.0;
+                                            surface_contact = SurfaceContact::NegY;
+                                         }
+                                    2 => {
+                                            dist_bf_collision.z = 0.0;
+                                            surface_contact = SurfaceContact::NegZ;
+                                         }
                                     _ => panic!(),
                                 }
                             }
@@ -130,9 +182,22 @@ pub fn do_physics (
                                 velocity[i] = 0.0;
 
                                 match i {
-                                    0 => surface_contact = SurfaceContact::PosX,
-                                    1 => surface_contact = SurfaceContact::PosY,
-                                    2 => surface_contact = SurfaceContact::PosZ,
+                                    0 => {
+                                            dist_bf_collision.x = 0.0;
+                                            surface_contact = SurfaceContact::PosX;
+                                         }
+                                    1 => {
+                                            if dist_bf_collision.y < -0.05 {
+                                                evr_fall.send(FallEvent::new(dist_bf_collision.y, entity));
+                                            }
+                                            
+                                            dist_bf_collision.y = 0.0;
+                                            surface_contact = SurfaceContact::PosY;
+                                         }
+                                    2 => {
+                                            dist_bf_collision.z = 0.0;
+                                            surface_contact = SurfaceContact::PosZ;
+                                         }
                                     _ => panic!(),
                                 }
                             }
@@ -183,6 +248,7 @@ pub fn do_physics (
         }
         else {
             transform.translation += frame_velocity;
+            **dist_bf_collision = dist_bf_collision_calc(**dist_bf_collision, frame_velocity);
         }
     }
 }
@@ -394,20 +460,19 @@ impl AabbCollider {
     }
 }
 
-#[derive(Component, Default, Copy, Clone, Reflect, Deref, DerefMut)]
-#[reflect(Component)]
+#[derive(Component, Default, Copy, Clone, Deref, DerefMut)]
 pub struct Gravity(pub f32);
 
-#[derive(Component, Default, Copy, Clone, Reflect, Deref, DerefMut)]
-#[reflect(Component)]
+#[derive(Component, Default, Copy, Clone, Deref, DerefMut)]
 pub struct LinearVelocity(pub Vec3);
 
+#[derive(Component, Default, Copy, Clone, Deref, DerefMut)]
+pub struct DistanceBeforeCollision(pub Vec3);
 
-#[derive(Component, Default, Clone, Reflect, Deref, DerefMut)]
-#[reflect(Component)]
+#[derive(Component, Default, Clone, Deref, DerefMut)]
 pub struct SurfaceContacts(pub HashSet<SurfaceContact>);
 
-#[derive(Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Reflect)]
+#[derive(Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SurfaceContact{
     PosY,
     NegY,

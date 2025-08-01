@@ -7,7 +7,7 @@ use std::cmp::max;
 
 use bevy::prelude::*;
 
-use crate::{MoveToSpawn, StatChangeEvent, StatType, Stats};
+use crate::{FallEvent, MoveToSpawn, StatChangeEvent, StatType, Stats};
 
 
 pub struct MechanicsPlugin;
@@ -22,12 +22,12 @@ impl Plugin for MechanicsPlugin {
 //Events
 #[derive(Clone, Copy, Event)]
 pub struct DeathEvent {
-    pub perpetrator: DeathPerpetrator,
-    pub cause: DeathCause,
+    pub perpetrator: Instigator,
+    pub cause: EffectCause,
     pub entity: Entity,
 }
 impl DeathEvent {
-    pub fn new(perpetrator: DeathPerpetrator, cause: DeathCause, entity: Entity) -> Self {
+    pub fn new(perpetrator: Instigator, cause: EffectCause, entity: Entity) -> Self {
         DeathEvent {perpetrator, cause, entity}
     }
 }
@@ -41,14 +41,16 @@ pub struct HasAir(pub bool);
 
 //Data
 #[derive(Clone, Copy, Debug)]
-pub enum DeathPerpetrator {
+pub enum Instigator {
     World,
     Entity(Entity),
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum DeathCause {
+pub enum EffectCause {
     Drowning,
+    Fall,
+    Revive,
 }
 
 pub fn handle_breath (
@@ -61,10 +63,10 @@ pub fn handle_breath (
     for (stats, has_air, entity) in &query {
         if stats.contains_key(&StatType::Breath) {
             if **has_air {
-                evw_stat_change.send(StatChangeEvent::new(StatType::Breath, time.delta_seconds() * 30.0, entity));
+                evw_stat_change.send(StatChangeEvent::new(Instigator::World, EffectCause::Drowning, StatType::Breath, time.delta_seconds() * 30.0, entity));
             }
             else {
-                evw_stat_change.send(StatChangeEvent::new(StatType::Breath, time.delta_seconds() * -6.5, entity));
+                evw_stat_change.send(StatChangeEvent::new(Instigator::World, EffectCause::Drowning, StatType::Breath, time.delta_seconds() * -6.5, entity));
             }
         }
     }
@@ -80,10 +82,21 @@ pub fn handle_suffocation (
         if stats.contains_key(&StatType::Breath) { //&& stats.contains_key(&StatType::Health)
             if !**has_air && stats.get(&StatType::Breath).unwrap().base <= 0.0 {
                 // Just kill the sucker. We might do gradual HP loss later if that seems more appropriate.
-                evw_death.send(DeathEvent::new(DeathPerpetrator::World, DeathCause::Drowning, entity));
+                evw_death.send(DeathEvent::new(Instigator::World, EffectCause::Drowning, entity));
             }
         }
     } 
+}
+
+pub fn handle_fall_damage (
+    mut evr_fall: EventReader<FallEvent>,
+    mut evw_stat_change: EventWriter<StatChangeEvent>,
+) {
+    for ev in evr_fall.read() {
+        if ev.distance <= -4.0 {
+            evw_stat_change.send(StatChangeEvent::new(Instigator::World, EffectCause::Fall, StatType::Health, (ev.distance + 3.0).floor(), ev.entity));
+        }
+    }
 }
 
 pub fn handle_death (
@@ -100,10 +113,10 @@ pub fn handle_death (
         // TODO: Perhaps some sort of respawn dialogue before respawning the player? Unsure. Perhaps some timer...
         if let Ok(stats) = query.get(ev.entity) {
             if stats.contains_key(&StatType::Health) {
-                evw_stat_change.send(StatChangeEvent::new(StatType::Health, f32::MAX, ev.entity));
+                evw_stat_change.send(StatChangeEvent::new(Instigator::World, EffectCause::Revive, StatType::Health, f32::MAX, ev.entity));
             }
             if stats.contains_key(&StatType::Breath) {
-                evw_stat_change.send(StatChangeEvent::new(StatType::Breath, f32::MAX, ev.entity));
+                evw_stat_change.send(StatChangeEvent::new(Instigator::World, EffectCause::Revive, StatType::Breath, f32::MAX, ev.entity));
             }
         }
         commands.entity(ev.entity).insert(MoveToSpawn);

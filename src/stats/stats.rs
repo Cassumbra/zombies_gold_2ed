@@ -2,6 +2,8 @@ use std::collections::BTreeMap;
 
 use bevy::{prelude::*, utils::HashMap};
 
+use crate::{DeathEvent, EffectCause, Instigator};
+
 pub struct StatsPlugin;
 
 impl Plugin for StatsPlugin {
@@ -83,19 +85,22 @@ impl Stats {
 //Events
 #[derive(Clone, Copy, Event)]
 pub struct StatChangeEvent {
+    pub instigator: Instigator,
+    pub cause: EffectCause,
     pub stat: StatType,
     pub amount: f32,
     pub entity: Entity,
 }
 impl StatChangeEvent {
-    pub fn new(stat: StatType, amount: f32, entity: Entity) -> Self {
-        StatChangeEvent {stat, amount, entity}
+    pub fn new(instigator: Instigator, cause: EffectCause, stat: StatType, amount: f32, entity: Entity) -> Self {
+        StatChangeEvent {instigator, cause, stat, amount, entity}
     }
 }
 
 //Systems
 pub fn do_stat_change (
     mut evr_stat_change: EventReader<StatChangeEvent>,
+    mut evw_death: EventWriter<DeathEvent>,
 
     mut stats_query: Query<&mut Stats>,
 ) {
@@ -105,6 +110,15 @@ pub fn do_stat_change (
             stats.get_mut(&ev.stat).unwrap().base += ev.amount;
             
             stats.get_mut(&ev.stat).unwrap().base = stats.get_base(&ev.stat).clamp(stats.get_min(&ev.stat), stats.get_max(&ev.stat));
+
+            if ev.stat == StatType::Health {
+                println!("{:?} changed: {}", ev.stat, stats.get(&ev.stat).unwrap().base);
+            }
+            
+
+            if ev.stat == StatType::Health && stats.get(&ev.stat).unwrap().base <= 0.0 {
+                evw_death.send(DeathEvent::new(ev.instigator, ev.cause, ev.entity));
+            }
         }
     }
 }
