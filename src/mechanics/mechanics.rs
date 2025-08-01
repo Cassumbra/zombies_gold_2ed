@@ -94,7 +94,7 @@ pub fn handle_fall_damage (
 ) {
     for ev in evr_fall.read() {
         if ev.distance <= -4.0 {
-            evw_stat_change.send(StatChangeEvent::new(Instigator::World, EffectCause::Fall, StatType::Health, (ev.distance + 3.0).floor(), ev.entity));
+            evw_stat_change.send(StatChangeEvent::new(Instigator::World, EffectCause::Fall, StatType::Health, (ev.distance + 3.0).ceil(), ev.entity));
         }
     }
 }
