@@ -327,53 +327,45 @@ pub fn update_resource_counts (
 pub fn update_health_bar (
     mut commands: Commands,
 
-    player_query: Query<&Stats, With<Player>>,
+    player_query: Query<&Stats, (With<Player>, Or<(Changed<Stats>, Added<Stats>)>)>,
 
     //inventory_query: Query<(&Inventory), (With<Player>, Changed<Inventory>)>,
     root_query: Query<(Entity), With<HealthBarRoot>>,
     health_display_query: Query<(Entity), With<HealthDisplay>>,
 
     atlas: Res<Atlas>,
-
-    mut evr_stat_change: EventReader<StatChangeEvent>,
 ) {
-    for ev in evr_stat_change.read() {
-        if ev.stat == StatType::Health {
-            if let Ok(stats) = player_query.get(ev.entity) {
-                if let Ok(root) = root_query.get_single() {
-                    for entity in &health_display_query {
-                        commands.entity(entity).despawn_recursive();
-                    }
-                    let mut remaining_health = stats.get_base(&StatType::Health);
-                    for _ in 0..(stats.get_max(&StatType::Health)/4.0).ceil() as i32 {
-                        // TODO: Make this some sort of constant
-                        let base_index = 19;
-                        let index = base_index + (4 - min(remaining_health as usize, 4));
+    if let Ok(stats) = player_query.get_single() {
+        if let Ok(root) = root_query.get_single() {
+            for entity in &health_display_query {
+                commands.entity(entity).despawn_recursive();
+            }
+            let mut remaining_health = stats.get_base(&StatType::Health);
+            for _ in 0..(stats.get_max(&StatType::Health)/4.0).ceil() as i32 {
+                // TODO: Make this some sort of constant
+                let base_index = 19;
+                let index = base_index + (4 - min(remaining_health as usize, 4));
 
-                        let health_display_unit = commands.spawn(ImageBundle {
-                                style: Style {
-                                    width: Val::Px(64.),
-                                    height: Val::Px(64.),
-                                    ..default()
-                                },
-                                image: UiImage::new(atlas.ui_16x16.clone()),
-                                ..default()
-                                },
-                                )
-                            .insert(TextureAtlas{ layout: atlas.ui_16x16_layout.clone(), index})
-                            .insert(HealthDisplay)
-                            .id();
+                let health_display_unit = commands.spawn(ImageBundle {
+                        style: Style {
+                            width: Val::Px(64.),
+                            height: Val::Px(64.),
+                            ..default()
+                        },
+                        image: UiImage::new(atlas.ui_16x16.clone()),
+                        ..default()
+                        },
+                        )
+                    .insert(TextureAtlas{ layout: atlas.ui_16x16_layout.clone(), index})
+                    .insert(HealthDisplay)
+                    .id();
 
-                        commands.entity(root).add_child(health_display_unit);
+                commands.entity(root).add_child(health_display_unit);
 
-                        remaining_health -= 4.0;
-                        if remaining_health < 0.0 {remaining_health = 0.0};
-                    }
-                }
-                break
+                remaining_health -= 4.0;
+                if remaining_health < 0.0 {remaining_health = 0.0};
             }
         }
-        
     }
 }
 

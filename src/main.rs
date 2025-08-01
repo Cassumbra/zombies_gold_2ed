@@ -246,12 +246,14 @@ fn main () {
     .add_systems(Update, mechanics::handle_suffocation)
     .add_systems(Update, mechanics::handle_fall_damage)
     .add_systems(Update, mechanics::handle_death)
-    .add_systems(Update, (
-            stats::do_stat_change,
-            ui::update_health_bar.run_if(in_state(GameState::Playing)),
-        )
-            .chain(),
-    )
+    .add_systems(Update, stats::do_stat_change)
+    .add_systems(Update, ui::update_health_bar.run_if(in_state(GameState::Playing)))
+    //.add_systems(Update, (
+    //        stats::do_stat_change,
+    //        ui::update_health_bar.run_if(in_state(GameState::Playing)),
+    //    )
+    //        .chain(),
+    //)
 
     .add_systems(Update, player_input_game)
     
@@ -363,7 +365,6 @@ pub fn setup (
     mut commands: Commands,
 
     mut images: ResMut<Assets<Image>>,
-    //mut evw_stat_change: EventWriter<StatChangeEvent>,
     //mut meshes: ResMut<Assets<Mesh>>,
     //mut materials: ResMut<Assets<StandardMaterial>>,
     //assets: Res<AssetServer>,
@@ -485,8 +486,6 @@ pub fn setup (
     ))
     .add_child(camera_entity)
     .id();
-
-    //evw_stat_change.send(StatChangeEvent::new(Instigator::World, EffectCause::Revive, StatType::Health, ));
 }
 
 /*
