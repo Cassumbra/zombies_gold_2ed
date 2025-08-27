@@ -17,7 +17,7 @@ impl Default for Hotbar {
     }
 }
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SlotAction {
     #[default] None,
     Block(BlockID)

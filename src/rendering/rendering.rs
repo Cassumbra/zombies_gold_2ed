@@ -445,6 +445,8 @@ pub fn update_water_material (
 
 #[derive(AssetCollection, Resource)]
 pub struct Atlas{
+    #[asset(texture_atlas_layout(tile_size_x = 8., tile_size_y = 8., columns = 32, rows = 32, padding_x = 0., padding_y = 0., offset_x = 0., offset_y = 0.))]
+    pub res_8x8_layout: Handle<TextureAtlasLayout>,
     #[asset(path = "textures_8x8.png")]
     pub res_8x8: Handle<Image>,
 

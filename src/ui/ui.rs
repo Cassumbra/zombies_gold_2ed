@@ -3,7 +3,7 @@ use std::cmp::min;
 use bevy::{a11y::AccessibilityNode, prelude::*};
 use iyes_perf_ui::PerfUiCompleteBundle;
 
-use crate::{hotbar::Hotbar, Atlas, BuildingEvent, BuildingTimer, HasAir, Inventory, ItemID, MiningEvent, MiningTimer, Player, StatChangeEvent, StatType, Stats};
+use crate::{hotbar::{Hotbar, SlotAction}, Atlas, BuildingEvent, BuildingTimer, HasAir, Inventory, ItemID, MiningEvent, MiningTimer, Player, StatChangeEvent, StatType, Stats};
 
 
 pub fn setup_ui (
@@ -394,6 +394,16 @@ pub fn update_hotbar (
                         style: Style {
                             width: Val::Px(64.),
                             height: Val::Px(64.),
+
+                            //flex_direction: FlexDirection::Column,
+                            //position_type: PositionType::Absolute,
+                            align_items: AlignItems::Center,
+                            justify_items: JustifyItems::Center,
+                            //align_self: AlignSelf::Center,
+                            //justify_self: JustifySelf::Center,
+                            align_content: AlignContent::Center,
+                            justify_content: JustifyContent::Center,
+
                             ..default()
                         },
                         image: UiImage::new(atlas.ui_16x16.clone()),
@@ -403,6 +413,44 @@ pub fn update_hotbar (
                     .insert(TextureAtlas{ layout: atlas.ui_16x16_layout.clone(), index})
                     .insert(HotBarSlot)
                     .id();
+
+                if hotbar.slots[i] != SlotAction::None {
+                    let action_icon = commands.spawn(ImageBundle {
+                        style: Style {
+                            width: Val::Px(32.),
+                            height: Val::Px(32.),
+
+                            flex_direction: FlexDirection::Column,
+                            position_type: PositionType::Absolute,
+                            align_items: AlignItems::Center,
+                            justify_items: JustifyItems::Center,
+                            align_self: AlignSelf::Center,
+                            justify_self: JustifySelf::Center,
+                            align_content: AlignContent::Center,
+                            justify_content: JustifyContent::Center,
+
+                            ..default()
+                        },
+                        image: UiImage::new(atlas.res_8x8.clone()),
+                        ..default()
+                        },
+                        )
+                    .insert(TextureAtlas{ layout: atlas.res_8x8_layout.clone(), index: match hotbar.slots[i] {
+                        SlotAction::None => {panic!()},
+                        SlotAction::Block(block_id) => {
+                            let coords = block_id.get_attributes().tex_coords.top;
+                            // TODO: Hardcoded values are cringe.
+                            (coords.y * 32 + coords.x) as usize
+                        },
+                    }})
+                    .insert(HotBarSlot)
+                    .id();
+
+                    commands.entity(hotbar_slot).add_child(action_icon);
+                }
+                
+
+                
 
                 commands.entity(root).add_child(hotbar_slot);
             }
