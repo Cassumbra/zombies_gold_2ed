@@ -868,7 +868,7 @@ impl BlockID {
             BlockID::Log => BlockAttributes { health: 2, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 4)), give_on_damage: Some(Item{id: ItemID::Wood, amount: 32}), ..default() },
             BlockID::Leaves => BlockAttributes { health: 1, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 5)), solidity: Solidity::NonSolid, ..default() },
             BlockID::Water => BlockAttributes {health: 0, tex_coords: TextureCoords::unique_top(IVec2::new(0, 7), IVec2::new(1, 7)), solidity: Solidity::Water, ..default()},
-            BlockID::Planks => BlockAttributes { health: 3, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 6)), solidity: Solidity::NonSolid, ..default() },
+            BlockID::Planks => BlockAttributes { health: 3, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 6)), solidity: Solidity::Solid, give_on_damage: Some(Item{ id: ItemID::Wood, amount: 2}), cost_to_build: [Some(Item::new(ItemID::Wood, 8)), None, None], ..default() },
             
         }
     }

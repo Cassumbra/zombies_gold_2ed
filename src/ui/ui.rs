@@ -388,7 +388,7 @@ pub fn update_hotbar (
             }
             for i in 0..hotbar.slots.len() {
                 // TODO: Make this some sort of constant
-                let index = if hotbar.position == i as u8 {35} else {34};
+                let index = if hotbar.position == i {35} else {34};
 
                 let hotbar_slot = commands.spawn(ImageBundle {
                         style: Style {
@@ -445,7 +445,7 @@ pub fn update_hotbar (
                     }})
                     .insert(HotBarSlot)
                     .id();
-
+                    // TODO: Display the number of blocks we can place given our current resources
                     commands.entity(hotbar_slot).add_child(action_icon);
                 }
                 

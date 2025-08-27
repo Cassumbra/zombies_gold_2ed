@@ -5,7 +5,7 @@ use crate::BlockID;
 // Components
 #[derive(Clone, Debug, Component)]
 pub struct Hotbar {
-    pub position: u8,
+    pub position: usize,
     pub slots: Vec<SlotAction>,
 }
 impl Default for Hotbar {

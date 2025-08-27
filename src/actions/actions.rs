@@ -4,7 +4,7 @@ use bevy::{prelude::*, time::Stopwatch};
 
 use movement::*;
 
-use crate::{block_pos_from_global, chunk_pos_from_global, raycast_blocks, update_chunk_events_from_global, Block, BlockID, BlockUpdateEvent, Chunk, ChunkMap, Inventory, UpdateChunkEvent, CHUNK_SIZE};
+use crate::{block_pos_from_global, chunk_pos_from_global, hotbar::{Hotbar, SlotAction}, raycast_blocks, update_chunk_events_from_global, Block, BlockID, BlockUpdateEvent, Chunk, ChunkMap, Inventory, UpdateChunkEvent, CHUNK_SIZE};
 pub mod movement;
 
 
@@ -175,7 +175,7 @@ pub fn damage_block (
 
 pub fn building (
     // TODO: Add some component to tell us what to actually build.
-    mut builder_query: Query<(Entity, &mut BuildingTimer, &Children)>,
+    mut builder_query: Query<(Entity, &mut BuildingTimer, &Children, &Hotbar)>,
     // TODO: We should use some "head" component or something later on when we have entities that build but don't have a camera.
     cam_query: Query<(&GlobalTransform), With<Camera>>,
 
@@ -186,36 +186,43 @@ pub fn building (
 
     time: Res<Time>,
 ) {
-    for (entity, mut timer, children) in &mut builder_query {
-        timer.tick(time.delta());
+    for (entity, mut timer, children, hotbar) in &mut builder_query {
+        match hotbar.slots[hotbar.position] {
+            SlotAction::Block(block_id) => {
+                timer.tick(time.delta());
 
-        if timer.finished() {
+                if timer.finished() {
 
-            for child in children.iter() {
-                if let Ok(global_transform) = cam_query.get(*child) {
-                    let hits = raycast_blocks(global_transform.translation(), global_transform.forward().normalize(), 5.0);
-                    for hit in hits {
-                        //println!("hit_position: {}, hit_normal: {}", hit.position, hit.normal);
+                    for child in children.iter() {
+                        if let Ok(global_transform) = cam_query.get(*child) {
+                            let hits = raycast_blocks(global_transform.translation(), global_transform.forward().normalize(), 5.0);
+                            for hit in hits {
+                                //println!("hit_position: {}, hit_normal: {}", hit.position, hit.normal);
 
-                        let chunk_pos = chunk_pos_from_global(hit.position.as_ivec3());
+                                let chunk_pos = chunk_pos_from_global(hit.position.as_ivec3());
 
-                        if let Some(chunk) = chunk_map.get(&chunk_pos) {
-                            let block_pos = block_pos_from_global(hit.position.as_ivec3());
+                                if let Some(chunk) = chunk_map.get(&chunk_pos) {
+                                    let block_pos = block_pos_from_global(hit.position.as_ivec3());
 
-                            if chunk.blocks[block_pos].id != BlockID::Air && chunk.blocks[block_pos].id != BlockID::Water {
-                                evw_put_block.send(PutBlockEvent { position: hit.position.as_ivec3() + hit.normal.as_ivec3(), id: BlockID::StoneBrick, entity } );
-                                break;
+                                    if chunk.blocks[block_pos].id != BlockID::Air && chunk.blocks[block_pos].id != BlockID::Water {
+                                        evw_put_block.send(PutBlockEvent { position: hit.position.as_ivec3() + hit.normal.as_ivec3(), id: block_id, entity } );
+                                        break;
+                                    }
+                                }
                             }
                         }
                     }
                 }
-            }
+            },
+            _ => continue,
         }
+
+        
     }
 
     // TODO: Should this be a separate system?
     for ev in evr_building.read() {
-        if let Ok((_, mut timer, _)) = builder_query.get_mut(ev.entity) {
+        if let Ok((_, mut timer, _, _)) = builder_query.get_mut(ev.entity) {
             if ev.is_start {
                 timer.unpause();
             }
