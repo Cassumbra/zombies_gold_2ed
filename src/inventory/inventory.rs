@@ -1,7 +1,10 @@
 use std::{collections::VecDeque, fmt::Display};
 
+use hotbar::*;
 use bevy::{prelude::*, utils::hashbrown::HashMap};
 use itertools::Itertools;
+
+pub mod hotbar;
 
 const MAX_MATERIAL: u16 = 2048;
 const INVENTORY_SIZE: IVec2 = IVec2::new(9, 2);

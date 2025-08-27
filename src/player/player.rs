@@ -9,6 +9,7 @@ use bevy::{math, prelude::*};
 use leafwing_input_manager::action_state::ActionState;
 use leafwing_input_manager::input_mocking::QueryInput;
 
+use crate::hotbar::Hotbar;
 use crate::movement::{MovementAction, MovementType};
 use crate::point::Point3d;
 use crate::{Action, BuildingEvent, MiningEvent, PLAYER_HEIGHT};
@@ -26,7 +27,7 @@ pub struct Player;
 /// Player input.
 pub fn player_input_game (
     //query: Query<(Entity, &ActionState<Action>, &MovementAcceleration, &JumpImpulse, &mut LinearVelocity, Has<Grounded>,), (With<Player>)>,
-    mut query: Query<(Entity, &ActionState<Action>, &mut Transform, &Children), (With<Player>)>,
+    mut query: Query<(Entity, &ActionState<Action>, &mut Transform, &Children, Option<&mut Hotbar>), (With<Player>)>,
     mut cam_query: Query<(&mut Transform), (Without<Player>)>,
     
     mut evw_movement: EventWriter<MovementAction>,
@@ -36,7 +37,7 @@ pub fn player_input_game (
     mut primary_window: Query<&mut Window, With<PrimaryWindow>>
 ) {
     // TODO: Perhaps we should send events for movement instead of moving directly?
-    if let Ok((player, action_state, mut transform, children)) = query.get_single_mut() {
+    if let Ok((player, action_state, mut transform, children, opt_hotbar)) = query.get_single_mut() {
         //println!("{:?}", transform.translation());
         // Modified from bevy_xpbd's examples + bevy_flycam
         let forward = Vec3::from(transform.forward());
@@ -112,7 +113,38 @@ pub fn player_input_game (
             
         }
         
-        
+        if let Some(mut hotbar) = opt_hotbar {
+            if action_state.just_pressed(&Action::Slot1) && hotbar.slots.len() > 0 {
+                hotbar.position = 0;
+            }
+            if action_state.just_pressed(&Action::Slot2) && hotbar.slots.len() > 1 {
+                hotbar.position = 1;
+            }
+            if action_state.just_pressed(&Action::Slot3) && hotbar.slots.len() > 2 {
+                hotbar.position = 2;
+            }
+            if action_state.just_pressed(&Action::Slot4) && hotbar.slots.len() > 3 {
+                hotbar.position = 3;
+            }
+            if action_state.just_pressed(&Action::Slot5) && hotbar.slots.len() > 4 {
+                hotbar.position = 4;
+            }
+            if action_state.just_pressed(&Action::Slot6) && hotbar.slots.len() > 5 {
+                hotbar.position = 5;
+            }
+            if action_state.just_pressed(&Action::Slot7) && hotbar.slots.len() > 6 {
+                hotbar.position = 6;
+            }
+            if action_state.just_pressed(&Action::Slot8) && hotbar.slots.len() > 7 {
+                hotbar.position = 7;
+            }
+            if action_state.just_pressed(&Action::Slot9) && hotbar.slots.len() > 8 {
+                hotbar.position = 8;
+            }
+            if action_state.just_pressed(&Action::Slot0) && hotbar.slots.len() > 9 {
+                hotbar.position = 9;
+            }
+        }
         
         
     }   

@@ -3,7 +3,7 @@ use std::cmp::min;
 use bevy::{a11y::AccessibilityNode, prelude::*};
 use iyes_perf_ui::PerfUiCompleteBundle;
 
-use crate::{Atlas, BuildingEvent, BuildingTimer, HasAir, Inventory, ItemID, MiningEvent, MiningTimer, Player, StatChangeEvent, StatType, Stats};
+use crate::{hotbar::Hotbar, Atlas, BuildingEvent, BuildingTimer, HasAir, Inventory, ItemID, MiningEvent, MiningTimer, Player, StatChangeEvent, StatType, Stats};
 
 
 pub fn setup_ui (
@@ -179,7 +179,7 @@ pub fn setup_ui (
             },
 
             ..default()
-        }).with_children(|parent| {
+        }).insert(HotBarRoot).with_children(|parent| {
             for _ in 0..=9 {
                 parent.spawn(ImageBundle {
                     style: Style {
@@ -191,7 +191,8 @@ pub fn setup_ui (
                     ..default()
                     },
                     )
-                    .insert(TextureAtlas{ layout: atlas.ui_16x16_layout.clone(), index: 34 as usize});
+                    .insert(TextureAtlas{ layout: atlas.ui_16x16_layout.clone(), index: 34 as usize})
+                    .insert(HotBarSlot);
             }
         });
         
@@ -369,6 +370,45 @@ pub fn update_health_bar (
     }
 }
 
+pub fn update_hotbar (
+    mut commands: Commands,
+
+    player_query: Query<&Hotbar, (With<Player>, Or<(Changed<Hotbar>, Added<Hotbar>)>)>,
+
+    //inventory_query: Query<(&Inventory), (With<Player>, Changed<Inventory>)>,
+    root_query: Query<(Entity), With<HotBarRoot>>,
+    hotbar_slot_query: Query<(Entity), With<HotBarSlot>>,
+
+    atlas: Res<Atlas>,
+) {
+    if let Ok(hotbar) = player_query.get_single() {
+        if let Ok(root) = root_query.get_single() {
+            for entity in &hotbar_slot_query {
+                commands.entity(entity).despawn_recursive();
+            }
+            for i in 0..hotbar.slots.len() {
+                // TODO: Make this some sort of constant
+                let index = if hotbar.position == i as u8 {35} else {34};
+
+                let hotbar_slot = commands.spawn(ImageBundle {
+                        style: Style {
+                            width: Val::Px(64.),
+                            height: Val::Px(64.),
+                            ..default()
+                        },
+                        image: UiImage::new(atlas.ui_16x16.clone()),
+                        ..default()
+                        },
+                        )
+                    .insert(TextureAtlas{ layout: atlas.ui_16x16_layout.clone(), index})
+                    .insert(HotBarSlot)
+                    .id();
+
+                commands.entity(root).add_child(hotbar_slot);
+            }
+        }
+    }
+}
 
 
 const PROGRESS_BAR_SMOOTHNESS: f32 = 12.0;
@@ -430,6 +470,10 @@ pub struct ItemDisplay(ItemID);
 #[derive(Component, Clone, Debug, Reflect)]
 #[reflect(Component)]
 pub struct HotBarRoot;
+
+#[derive(Component, Clone, Debug, Reflect)]
+#[reflect(Component)]
+pub struct HotBarSlot;
 
 #[derive(Component, Clone, Debug, Reflect)]
 #[reflect(Component)]

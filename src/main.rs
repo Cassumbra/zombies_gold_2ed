@@ -17,6 +17,7 @@ use bevy::transform::TransformSystem::TransformPropagate;
 use bevy_asset_loader::prelude::*;
 //use bevy_mod_mipmap_generator::{generate_mipmaps, MipmapGeneratorPlugin, MipmapGeneratorSettings};
 use fastrand::Rng;
+use hotbar::Hotbar;
 use iyes_perf_ui::PerfUiPlugin;
 //use bevy_flycam::PlayerPlugin;
 use leafwing_input_manager::prelude::*;
@@ -248,6 +249,7 @@ fn main () {
     .add_systems(Update, mechanics::handle_death)
     .add_systems(Update, stats::do_stat_change)
     .add_systems(Update, ui::update_health_bar.run_if(in_state(GameState::Playing)))
+    .add_systems(Update, ui::update_hotbar.run_if(in_state(GameState::Playing)))
     //.add_systems(Update, (
     //        stats::do_stat_change,
     //        ui::update_health_bar.run_if(in_state(GameState::Playing)),
@@ -348,13 +350,19 @@ enum Action {
     Crouch, Jump,
     Look, Primary, Secondary,
     MenuBack,
+    Slot1, Slot2, Slot3, Slot4, Slot5, Slot6, Slot7, Slot8, Slot9, Slot0
 }
 
-const INPUT_MAP: [(Action, InputKind); 10] = [(Action::MoveForward, InputKind::PhysicalKey(KeyCode::KeyW)), (Action::MoveBackward, InputKind::PhysicalKey(KeyCode::KeyS)),
+const INPUT_MAP: [(Action, InputKind); 20] = [(Action::MoveForward, InputKind::PhysicalKey(KeyCode::KeyW)), (Action::MoveBackward, InputKind::PhysicalKey(KeyCode::KeyS)),
                                             (Action::MoveLeft, InputKind::PhysicalKey(KeyCode::KeyA)), (Action::MoveRight, InputKind::PhysicalKey(KeyCode::KeyD)),
                                             (Action::Crouch, InputKind::PhysicalKey(KeyCode::ShiftLeft)), (Action::Jump, InputKind::PhysicalKey(KeyCode::Space)),
                                             (Action::Look, InputKind::DualAxis(DualAxis::mouse_motion())), (Action::Primary, InputKind::Mouse(MouseButton::Left)), (Action::Secondary, InputKind::Mouse(MouseButton::Right)),
                                             (Action::MenuBack, InputKind::PhysicalKey(KeyCode::Escape)),
+
+                                            (Action::Slot1, InputKind::PhysicalKey(KeyCode::Digit1)), (Action::Slot2, InputKind::PhysicalKey(KeyCode::Digit2)), (Action::Slot3, InputKind::PhysicalKey(KeyCode::Digit3)), 
+                                            (Action::Slot4, InputKind::PhysicalKey(KeyCode::Digit4)), (Action::Slot5, InputKind::PhysicalKey(KeyCode::Digit5)), (Action::Slot6, InputKind::PhysicalKey(KeyCode::Digit6)), 
+                                            (Action::Slot7, InputKind::PhysicalKey(KeyCode::Digit7)), (Action::Slot8, InputKind::PhysicalKey(KeyCode::Digit8)), (Action::Slot9, InputKind::PhysicalKey(KeyCode::Digit9)), 
+                                            (Action::Slot0, InputKind::PhysicalKey(KeyCode::Digit0)), 
                                           ];
 
 pub fn app_exit (mut events: EventReader<AppExit>) -> bool {
@@ -482,8 +490,9 @@ pub fn setup (
             (StatType::Health, Stat::new(0.0, 20.0)),
             (StatType::Breath, Stat::new(0.0, 100.0)),
         ])),
+        
         HasAir(true),
-    ))
+    )).insert(Hotbar::default())
     .add_child(camera_entity)
     .id();
 }
