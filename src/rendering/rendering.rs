@@ -294,17 +294,32 @@ pub fn update_chunk_meshes (
             */
     
             if render_mesh.count_vertices() != 0 {
-                commands.entity(chunk_map[&**ev].render_entity.unwrap())
-                    .try_insert(mesh_handle)
-                    .try_insert(materials.world_res_8x8.clone())
-                    .try_insert(Visibility::default())
-                    .try_insert(InheritedVisibility::default())
-                    .try_insert(ViewVisibility::default())
+                // TODO: Perhaps it would be better to 
+                let render_entity_bundle = (
+                    Transform::from_translation((**ev * CHUNK_SIZE).as_vec3()),
+                    GlobalTransform::default(),
+                    mesh_handle,
+                    materials.world_res_8x8.clone(),
+                    Visibility::default(),
+                    InheritedVisibility::default(),
+                    ViewVisibility::default(),
                     // TODO: This is a bandaid fix. Bevy isn't frustum culling correctly and we should properly fix it instead of just disabling it. Oh well.
-                    .try_insert(NoFrustumCulling);
+                    NoFrustumCulling,
+                );
+
+                if let Some(render_entity) = chunk_map.get(&**ev).unwrap().render_entity {
+                    commands.entity(render_entity).insert(render_entity_bundle);
+                }
+                else {
+                    chunk_map.get_mut(&**ev).unwrap().render_entity = Some(
+                        commands.spawn(render_entity_bundle).id()
+                    );
+                }
+                
+                
             }
         }
-
+        
         if !water_voxels_fully_empty || !water_voxels_fully_full {
             let mut buffer = UnitQuadBuffer::new();
             visible_block_faces(
@@ -386,6 +401,7 @@ pub fn update_chunk_meshes (
                     .try_insert(NoFrustumCulling);
             }
         }
+         
     }
 }
 

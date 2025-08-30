@@ -115,9 +115,9 @@ pub fn generate_chunks (
         if let Some(ev) = loading_queue.pop_back() {
             //println!(":3");
             //println!("loading: {:?}", ev.chunk);
-            let render_entity = Some(commands.spawn(Transform::from_translation((ev.chunk * CHUNK_SIZE).as_vec3()))
-                                        .insert(GlobalTransform::default())
-                                        .id());
+            //let render_entity = Some(commands.spawn(Transform::from_translation((ev.chunk * CHUNK_SIZE).as_vec3()))
+            //                            .insert(GlobalTransform::default())
+            //                            .id());
 
             let water_render_entity = Some(commands.spawn(Transform::from_translation((ev.chunk * CHUNK_SIZE).as_vec3()))
                                         .insert(GlobalTransform::default())
@@ -125,7 +125,7 @@ pub fn generate_chunks (
 
             let mut chunk = Chunk { blocks: Grid3::filled(Block::new(BlockID::Air), [CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE]),
                                     load_reasons: HashSet::from([ev.load_reason]),
-                                    render_entity,
+                                    render_entity: None, //render_entity,
                                     water_render_entity
                                   };
             
@@ -485,39 +485,6 @@ pub fn unload_chunks (
         chunk_map.remove(&pos);
         chunk_status_map.insert(pos, ChunkStatus::PartialSave);
     }
-    /*
-    while start.elapsed().as_millis() < 1 || !close_requested_evr.is_empty() {
-        if let Some(pos) = unloading_queue.pop_back() {
-            if !chunk_map.contains_key(&pos) {
-                continue
-            }
-
-            if let Some(chunk) = chunk_map.get_mut(&pos) {
-                if let Some(render_entity) = chunk.render_entity {
-                    commands.entity(render_entity).despawn();
-                }
-                if let Some(water_render_entity) = chunk.water_render_entity {
-                    commands.entity(water_render_entity).despawn();
-                }
-
-                let start_encode = Instant::now();
-                let mut e = GzEncoder::new(Vec::new(), Compression::fast());
-                for block in chunk_map.get(&pos).unwrap().blocks.iter() {
-                    e.write(&[block.id as u8, block.damage]).unwrap();
-                }
-                println!("time to encode: {:?}", start_encode.elapsed());
-
-                save_queue.insert(pos, e.finish().unwrap());
-
-                chunk_map.remove(&pos);
-                chunk_status_map.insert(pos, ChunkStatus::PartialSave);
-                //println!("yeet... {:?}", pos);
-            }
-        }
-        else {
-            break;
-        }
-    } */
 }
 
 pub fn save_chunks (
