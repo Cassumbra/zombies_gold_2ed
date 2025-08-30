@@ -148,7 +148,7 @@ pub fn update_chunk_meshes (
                         EMPTY
                     },
                     // TODO: We should make this use our attributes, later, once we have more blocks that are translucent.
-                    crate::BlockID::Leaves => {
+                    crate::BlockID::Leaves | crate::BlockID::Scaffold => {
                         voxels_fully_empty = false;
                         TRANSLUCENT
                     },

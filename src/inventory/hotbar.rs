@@ -2,6 +2,8 @@ use bevy::prelude::*;
 
 use crate::BlockID;
 
+use super::ItemID;
+
 // Components
 #[derive(Clone, Debug, Component)]
 pub struct Hotbar {
@@ -10,8 +12,8 @@ pub struct Hotbar {
 }
 impl Default for Hotbar {
     fn default() -> Self {
-        Self { position: 0, slots: vec![SlotAction::Block(BlockID::Planks), SlotAction::Block(BlockID::StoneBrick), SlotAction::None, 
-                                        SlotAction::None, SlotAction::None, SlotAction::None, 
+        Self { position: 0, slots: vec![SlotAction::Block(BlockID::Planks), SlotAction::Block(BlockID::StoneBrick), SlotAction::Block(BlockID::Crate), 
+                                        SlotAction::Block(BlockID::Scaffold), SlotAction::None, SlotAction::None, 
                                         SlotAction::None, SlotAction::None, SlotAction::None, 
                                         SlotAction::None, ]}
     }
@@ -20,5 +22,6 @@ impl Default for Hotbar {
 #[derive(Clone, Default, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SlotAction {
     #[default] None,
-    Block(BlockID)
+    Block(BlockID),
+    Item(ItemID),
 }

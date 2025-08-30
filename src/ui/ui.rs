@@ -442,6 +442,7 @@ pub fn update_hotbar (
                             // TODO: Hardcoded values are cringe.
                             (coords.y * 32 + coords.x) as usize
                         },
+                        SlotAction::Item(_) => todo!(),
                     }})
                     .insert(HotBarSlot)
                     .id();
