@@ -184,7 +184,7 @@ pub fn update_chunk_meshes (
 
         let faces = RIGHT_HANDED_Y_UP_CONFIG.faces;
 
-        if !voxels_fully_empty || !voxels_fully_full {
+        let mut generate_mesh = |voxels: [VisVoxel; ChunkShape::SIZE as usize], material: Handle<StandardMaterial>, render_entity_type: RenderEntity| {
             let mut buffer = UnitQuadBuffer::new();
             visible_block_faces(
                 &voxels,
@@ -232,27 +232,10 @@ pub fn update_chunk_meshes (
                         v += tex_coord.y as f32 * 8.0;
                         [u/256.0, v/256.0]
                     });
-                     
-    
-                     /*
-                    let top_left = (tex_coord.as_vec2() * 8.0).to_array();
-                    let top_right = [top_left[0], top_left[1] + 8.0];
-                    let bottom_left = [top_left[0] + 8.0, top_left[1]];
-                    let bottom_right = [top_left[0] + 8.0, top_left[1] + 8.0];
-    
-                    let quad_uvs = [bottom_right, top_right,
-                                    bottom_left, top_left,];
-    
-                    let quad_uvs = quad_uvs.map(|[u, v]| [u/256.0, v/256.0]);
-                     */
     
                     uvs.extend_from_slice(&quad_uvs);
                 }
             }
-    
-            //println!("uvs: {:?}", uvs);
-            //println!("positions: {:?}", positions);
-            //println!("indices: {:?}", indices);
     
             // TODO: Should we maybe set this to RENDER_WORLD only instead?
             let mut render_mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD);
@@ -269,8 +252,6 @@ pub fn update_chunk_meshes (
                 VertexAttributeValues::Float32x2(uvs),
             );
             render_mesh.insert_indices(Indices::U32(indices.clone()));
-    
-            //println!("{:?}", render_mesh);
     
             render_mesh.translate_by(Vec3::new(-1.5, -1.5, -1.5));
     
@@ -294,12 +275,11 @@ pub fn update_chunk_meshes (
             */
     
             if render_mesh.count_vertices() != 0 {
-                // TODO: Perhaps it would be better to 
                 let render_entity_bundle = (
                     Transform::from_translation((**ev * CHUNK_SIZE).as_vec3()),
                     GlobalTransform::default(),
                     mesh_handle,
-                    materials.world_res_8x8.clone(),
+                    material,
                     Visibility::default(),
                     InheritedVisibility::default(),
                     ViewVisibility::default(),
@@ -307,7 +287,10 @@ pub fn update_chunk_meshes (
                     NoFrustumCulling,
                 );
 
-                if let Some(render_entity) = chunk_map.get(&**ev).unwrap().render_entity {
+                if let Some(render_entity) = match render_entity_type {
+                    RenderEntity::World => chunk_map.get_mut(&**ev).unwrap().render_entity,
+                    RenderEntity::Water => chunk_map.get_mut(&**ev).unwrap().water_render_entity,
+                } {
                     commands.entity(render_entity).insert(render_entity_bundle);
                 }
                 else {
@@ -318,88 +301,14 @@ pub fn update_chunk_meshes (
                 
                 
             }
+        };
+
+        if !voxels_fully_empty || !voxels_fully_full {
+            generate_mesh(voxels, materials.world_res_8x8.clone(), RenderEntity::World);
         }
         
         if !water_voxels_fully_empty || !water_voxels_fully_full {
-            let mut buffer = UnitQuadBuffer::new();
-            visible_block_faces(
-                &water_voxels,
-                &ChunkShape {},
-                [0; 3],
-                [CHUNK_SIZE as u32 + 1, CHUNK_SIZE as u32 + 1, CHUNK_SIZE as u32 + 1],
-                &faces,
-                &mut buffer,
-            );
-
-            let num_indices = buffer.num_quads() * 6;
-            let num_vertices = buffer.num_quads() * 4;
-            let mut indices = Vec::with_capacity(num_indices);
-            let mut positions = Vec::with_capacity(num_vertices);
-            let mut normals = Vec::with_capacity(num_vertices);
-            let mut uvs = Vec::with_capacity(num_vertices);
-            for (group, face) in buffer.groups.into_iter().zip(faces.into_iter()) {
-                for quad in group.into_iter() {
-                    indices.extend_from_slice(&face.quad_mesh_indices(positions.len() as u32));
-                    positions.extend_from_slice(&face.quad_mesh_positions(&quad.into(), 1.0));
-                    normals.extend_from_slice(&face.quad_mesh_normals());
-    
-                    let block = chunk_map[&**ev].blocks[UVec3::from(quad.minimum) - UVec3::new(1, 1, 1)];
-                    let attributes = block.get_attributes();
-                    let normal = face.signed_normal();
-    
-                    let mut tex_coord = if normal.x == 1 {attributes.tex_coords.east}
-                                 else if normal.x == -1 {attributes.tex_coords.west}
-                                 else if normal.y == 1 {attributes.tex_coords.top}
-                                 else if normal.y == -1 {attributes.tex_coords.bottom}
-                                 else if normal.z == 1 {attributes.tex_coords.north}
-                                 else {attributes.tex_coords.south};
-    
-                    tex_coord.x += block.damage as i32;
-    
-                    
-                    let quad_uvs = face.tex_coords(RIGHT_HANDED_Y_UP_CONFIG.u_flip_face, true, &UnorientedQuad::from(quad)).map(|uv| {
-                        let mut u = uv[0] * 8.0;
-                        let mut v = uv[1] * 8.0;
-                        u += tex_coord.x as f32 * 8.0;
-                        v += tex_coord.y as f32 * 8.0;
-                        [u/256.0, v/256.0]
-                    });
-    
-                    uvs.extend_from_slice(&quad_uvs);
-                }
-            }
-    
-            let mut render_mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD);
-            render_mesh.insert_attribute(
-                Mesh::ATTRIBUTE_POSITION,
-                VertexAttributeValues::Float32x3(positions),
-            );
-            render_mesh.insert_attribute(
-                Mesh::ATTRIBUTE_NORMAL,
-                VertexAttributeValues::Float32x3(normals),
-            );
-            render_mesh.insert_attribute(
-                Mesh::ATTRIBUTE_UV_0,
-                VertexAttributeValues::Float32x2(uvs),
-            );
-            render_mesh.insert_indices(Indices::U32(indices.clone()));
-    
-            //println!("{:?}", render_mesh);
-    
-            render_mesh.translate_by(Vec3::new(-1.5, -1.5, -1.5));
-    
-            let mesh_handle = meshes.add(render_mesh.clone());
-
-            if render_mesh.count_vertices() != 0 {
-                commands.entity(chunk_map[&**ev].water_render_entity.unwrap())
-                    .try_insert(mesh_handle)
-                    .try_insert(materials.water_res_8x8.clone())
-                    .try_insert(Visibility::default())
-                    .try_insert(InheritedVisibility::default())
-                    .try_insert(ViewVisibility::default())
-                    // TODO: This is a bandaid fix. Bevy isn't frustum culling correctly and we should properly fix it instead of just disabling it. Oh well.
-                    .try_insert(NoFrustumCulling);
-            }
+            generate_mesh(water_voxels, materials.water_res_8x8.clone(), RenderEntity::Water);
         }
          
     }
@@ -412,6 +321,8 @@ pub fn modify_materials (
     if let Some(world_res_8x8) = material_assets.get_mut(&materials.world_res_8x8) {
         world_res_8x8.unlit = true;
         world_res_8x8.alpha_mode = AlphaMode::Mask(0.0);
+        //world_res_8x8.cull_mode = None;
+        //world_res_8x8.double_sided = true;
     }
 
     if let Some(water_res_8x8) = material_assets.get_mut(&materials.water_res_8x8) {
@@ -457,6 +368,11 @@ pub fn update_water_material (
             water_res_8x8.cull_mode = Some(Face::Back);
         }
     }
+}
+
+pub enum RenderEntity {
+    World,
+    Water,
 }
 
 #[derive(AssetCollection, Resource)]
