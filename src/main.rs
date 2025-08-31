@@ -28,6 +28,7 @@ use leafwing_input_manager::prelude::*;
 
 #[path = "spatial/spatial.rs"]
 mod spatial;
+use movement::Crouched;
 use spatial::*;
 
 
@@ -493,6 +494,7 @@ pub fn setup (
         
         HasAir(true),
     )).insert(Hotbar::default())
+    .insert(Crouched(false))
     .add_child(camera_entity)
     .id();
 }

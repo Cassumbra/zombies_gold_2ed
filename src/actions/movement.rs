@@ -24,6 +24,10 @@ pub enum MovementType {
     Jump,
 }
 
+#[derive(Component, Default, Copy, Clone, Reflect, Deref, DerefMut)]
+#[reflect(Component)]
+pub struct Crouched(pub bool);
+
 /// A marker component indicating that an entity is using a character controller.
 #[derive(Component)]
 pub struct CharacterController;
@@ -159,7 +163,7 @@ pub fn movement(
                     linear_velocity.z += direction.y * movement_acceleration.0 * delta_time;
                 }
                 MovementType::Jump => {
-                    if surface_contacts.contains(&SurfaceContact::PosY) || surface_contacts.contains(&SurfaceContact::Water) {
+                    if surface_contacts.contains(&SurfaceContact::PosY) || surface_contacts.contains(&SurfaceContact::Water) || surface_contacts.contains(&SurfaceContact::Climable) {
                         linear_velocity.y = jump_impulse.0;
                     }
                 }

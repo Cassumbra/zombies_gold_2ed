@@ -10,7 +10,7 @@ use leafwing_input_manager::action_state::ActionState;
 use leafwing_input_manager::input_mocking::QueryInput;
 
 use crate::hotbar::Hotbar;
-use crate::movement::{MovementAction, MovementType};
+use crate::movement::{Crouched, MovementAction, MovementType};
 use crate::point::Point3d;
 use crate::{Action, BuildingEvent, MiningEvent, PLAYER_HEIGHT};
 
@@ -27,7 +27,7 @@ pub struct Player;
 /// Player input.
 pub fn player_input_game (
     //query: Query<(Entity, &ActionState<Action>, &MovementAcceleration, &JumpImpulse, &mut LinearVelocity, Has<Grounded>,), (With<Player>)>,
-    mut query: Query<(Entity, &ActionState<Action>, &mut Transform, &Children, Option<&mut Hotbar>), (With<Player>)>,
+    mut query: Query<(Entity, &ActionState<Action>, &mut Transform, &Children, Option<&mut Hotbar>, Option<&mut Crouched>), (With<Player>)>,
     mut cam_query: Query<(&mut Transform), (Without<Player>)>,
     
     mut evw_movement: EventWriter<MovementAction>,
@@ -37,7 +37,7 @@ pub fn player_input_game (
     mut primary_window: Query<&mut Window, With<PrimaryWindow>>
 ) {
     // TODO: Perhaps we should send events for movement instead of moving directly?
-    if let Ok((player, action_state, mut transform, children, opt_hotbar)) = query.get_single_mut() {
+    if let Ok((player, action_state, mut transform, children, opt_hotbar, opt_crouched)) = query.get_single_mut() {
         //println!("{:?}", transform.translation());
         // Modified from bevy_xpbd's examples + bevy_flycam
         let forward = Vec3::from(transform.forward());
@@ -64,6 +64,16 @@ pub fn player_input_game (
 
         if action_state.pressed(&Action::Jump) {
             evw_movement.send(MovementAction::new(player, MovementType::Jump));
+        }
+        
+        if let Some(mut crouched) = opt_crouched {
+            if action_state.pressed(&Action::Crouch) {
+                **crouched = true;
+            }
+            else {
+                **crouched = false;
+            }
+
         }
 
         

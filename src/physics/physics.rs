@@ -1,7 +1,7 @@
 use bevy::{prelude::*, utils::HashSet};
 use itertools::{iproduct, izip};
 
-use crate::{block_pos_from_global, chunk_pos_from_global, BlockID, Chunk, ChunkMap, HasAir, Solidity};
+use crate::{block_pos_from_global, chunk_pos_from_global, movement::Crouched, BlockID, Chunk, ChunkMap, HasAir, Solidity};
 
 pub const BLOCK_AABB: AabbCollider = AabbCollider{ width: 1.0, height: 1.0, length: 1.0 };
 
@@ -44,7 +44,7 @@ pub fn apply_gravity (
 pub fn do_physics (
     mut commands: Commands,
 
-    mut query: Query<(Entity, &mut Transform, &mut LinearVelocity, &mut DistanceBeforeCollision, Option<&AabbCollider>, Option<&mut HasAir>)>,
+    mut query: Query<(Entity, &mut Transform, &mut LinearVelocity, &mut DistanceBeforeCollision, Option<&AabbCollider>, Option<&mut HasAir>, Option<&Crouched>)>,
 
     time: Res<Time>,
     chunk_map: Res<ChunkMap>,
@@ -68,7 +68,7 @@ pub fn do_physics (
         dbfc
     };
 
-    for (entity, mut transform, mut velocity, mut dist_bf_collision, opt_collider, mut opt_has_air) in &mut query {
+    for (entity, mut transform, mut velocity, mut dist_bf_collision, opt_collider, mut opt_has_air, opt_crouched) in &mut query {
         let frame_velocity = **velocity * time.delta_seconds();
 
         if let Some(collider) = opt_collider {
@@ -76,6 +76,9 @@ pub fn do_physics (
             
             let mut in_water = false;
             let mut mouth_submerged = false;
+
+            let mut in_deep_climable = false;
+            let mut in_climable = false;
 
             //println!("vrooms: {}", frame_velocity);
             //println!("steps: {}", step_count);
@@ -127,6 +130,29 @@ pub fn do_physics (
                                     mouth_submerged = mouth_box.get_intersection(mouth_box_pos, BLOCK_AABB, global_block_position.as_vec3());
                                 }
                             },
+                            Solidity::Climable => {
+                                **dist_bf_collision = Vec3::ZERO;
+                                let mut top_box = *collider;
+                                top_box.height /= 2.0;
+                                let mut top_box_pos = transform.translation;
+                                top_box_pos.y += top_box.height / 2.0;
+
+                                if !in_deep_climable {
+                                    in_deep_climable = top_box.get_intersection(top_box_pos, BLOCK_AABB, global_block_position.as_vec3());
+                                }
+
+                                in_climable = true;
+
+                                let (penetration, normal) = collider.get_penetration_and_normal(transform.translation, BLOCK_AABB, global_block_position.as_vec3());
+                                if let Some(crouched) = &opt_crouched {
+                                    if ***crouched {
+                                        return None;
+                                    }
+                                }
+                                if normal == Vec3::Y {
+                                    return Some(BlockCollision::new(global_block_position, penetration, normal, Some(chunk.blocks[block_position].id)));
+                                }
+                            },
                         }
                         return None;
                     }
@@ -144,6 +170,7 @@ pub fn do_physics (
 
                 let mut collisions_new = Vec::<BlockCollision>::new();
                 if in_water {applied_slip = Vec3::new(0.005, 0.0025, 0.005)};
+                if in_deep_climable {applied_slip = Vec3::new(0.001, 0.0025, 0.001)};
 
                 for (i, collision) in collisions.iter().enumerate() {
                     let (penetration, normal) = if i != 0 {collider.get_penetration_and_normal(transform.translation, BLOCK_AABB, collision.position.as_vec3())} else {(collision.penetration, collision.normal)};
@@ -240,6 +267,7 @@ pub fn do_physics (
             }
 
             let _ = if in_water {surface_contacts.insert(SurfaceContact::Water)} else {false};
+            let _ = if in_deep_climable {surface_contacts.insert(SurfaceContact::Climable)} else {false};
 
             commands.get_entity(entity).unwrap().insert(surface_contacts).insert(AppliedSlip(applied_slip));
             //commands.get_entity(entity).unwrap().insert(BlockCollisions(collisions_new));
@@ -480,8 +508,9 @@ pub enum SurfaceContact{
     NegX,
     PosZ,
     NegZ,
-    // TODO: Should this be part of this enum? or should it be its own component?
+    // TODO: Should these be part of this enum? or should they be their own components?
     Water,
+    Climable,
 }
 
  /*

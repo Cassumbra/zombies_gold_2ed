@@ -835,11 +835,11 @@ impl BlockID {
             BlockID::StoneBrick => BlockAttributes { health: 5, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 3)), give_on_damage: Some(Item{ id: ItemID::Stone, amount: 2 }), cost_to_build: [Some(Item::new(ItemID::Stone, 16)), None, None],  ..default() },
             // Logs will have special behavior for how they get mined, most likely. (Treefelling)
             BlockID::Log => BlockAttributes { health: 2, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 4)), give_on_damage: Some(Item{id: ItemID::Wood, amount: 32}), ..default() },
-            BlockID::Leaves => BlockAttributes { health: 1, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 5)), solidity: Solidity::NonSolid, ..default() },
+            BlockID::Leaves => BlockAttributes { health: 1, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 5)), solidity: Solidity::Climable, ..default() },
             BlockID::Water => BlockAttributes {health: 0, tex_coords: TextureCoords::unique_top(IVec2::new(0, 7), IVec2::new(1, 7)), solidity: Solidity::Water, ..default()},
             BlockID::Planks => BlockAttributes { health: 3, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 6)), solidity: Solidity::Solid, give_on_damage: Some(Item{ id: ItemID::Wood, amount: 2}), cost_to_build: [Some(Item::new(ItemID::Wood, 8)), None, None], ..default() },
             BlockID::Crate => BlockAttributes { health: 1, tex_coords: TextureCoords::symmetrical(IVec2::new(0, 8)), solidity: Solidity::Solid, give_on_damage: Some(Item{ id: ItemID::Wood, amount: 64}), cost_to_build: [Some(Item::new(ItemID::Wood, 64)), None, None], ..default() },
-            BlockID::Scaffold => BlockAttributes { health: 1, tex_coords: TextureCoords::asymmetric_y(IVec2::new(1, 8), IVec2::new(31, 31), IVec2::new(2, 8)), solidity: Solidity::NonSolid, give_on_damage: Some(Item{ id: ItemID::Wood, amount: 2}), cost_to_build: [Some(Item::new(ItemID::Wood, 2)), None, None], ..default() },
+            BlockID::Scaffold => BlockAttributes { health: 1, tex_coords: TextureCoords::asymmetric_y(IVec2::new(1, 8), IVec2::new(31, 31), IVec2::new(2, 8)), solidity: Solidity::Climable, give_on_damage: Some(Item{ id: ItemID::Wood, amount: 2}), cost_to_build: [Some(Item::new(ItemID::Wood, 2)), None, None], ..default() },
         }
     }
 
@@ -896,6 +896,7 @@ impl BlockAttributes {
     #[default] Solid,
     NonSolid,
     Water,
+    Climable,
  }
 
 // We might as well make this a struct instead of an enum, since it'll be the same size either way, and this will let us clarify what is what better.
