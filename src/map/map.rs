@@ -119,14 +119,15 @@ pub fn generate_chunks (
             //                            .insert(GlobalTransform::default())
             //                            .id());
 
-            let water_render_entity = Some(commands.spawn(Transform::from_translation((ev.chunk * CHUNK_SIZE).as_vec3()))
-                                        .insert(GlobalTransform::default())
-                                        .id());
+            //let water_render_entity = Some(commands.spawn(Transform::from_translation((ev.chunk * CHUNK_SIZE).as_vec3()))
+            //                            .insert(GlobalTransform::default())
+            //                            .id());
 
             let mut chunk = Chunk { blocks: Grid3::filled(Block::new(BlockID::Air), [CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE]),
                                     load_reasons: HashSet::from([ev.load_reason]),
                                     render_entity: None, //render_entity,
-                                    water_render_entity
+                                    water_render_entity: None,
+                                    translucent_render_entity: None,
                                   };
             
             //let start_chunkdata = Instant::now();
@@ -790,6 +791,7 @@ pub struct Chunk {
     pub load_reasons: HashSet<LoadReason>,
     pub render_entity: Option<Entity>,
     pub water_render_entity: Option<Entity>,
+    pub translucent_render_entity: Option<Entity>,
 }
 
 

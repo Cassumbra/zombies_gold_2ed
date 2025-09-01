@@ -15,7 +15,8 @@ use crate::{block_pos_from_global, chunk_pos_from_global, BlockID, ChunkMap, Upd
 use block_mesh::ndshape::{ConstShape, ConstShape3u32};
 use block_mesh::{greedy_quads, visible_block_faces, GreedyQuadsBuffer, MergeVoxel, UnitQuadBuffer, UnorientedQuad, Voxel, VoxelVisibility, RIGHT_HANDED_Y_UP_CONFIG};
 
-
+pub mod meshers;
+use meshers::*;
 
 
 
@@ -132,6 +133,10 @@ pub fn update_chunk_meshes (
         let mut water_voxels_fully_full = true;
         let mut water_voxels_fully_empty = false;
 
+        let mut translucent_voxels = [EMPTY; ChunkShape::SIZE as usize];
+        let mut translucent_voxels_fully_full = true;
+        let mut translucent_voxels_fully_empty = false;
+
         let offset = **ev * CHUNK_SIZE;
 
         for (x, y, z) in iproduct!(-1..=CHUNK_SIZE, -1..=CHUNK_SIZE, -1..=CHUNK_SIZE) {
@@ -143,14 +148,10 @@ pub fn update_chunk_meshes (
             voxels[ChunkShape::linearize([(x + 1) as u32, (y + 1) as u32, (z + 1) as u32]) as usize] = 
             if let Some(chunk) = chunk_map.get(&chunk_position) {
                 match chunk.blocks[block_position].id {
-                    crate::BlockID::Air | crate::BlockID::Water => {
+                                                                // TODO: We should make this use our attributes, later, once we have more blocks that are translucent.
+                    crate::BlockID::Air | crate::BlockID::Water | crate::BlockID::Leaves | crate::BlockID::Scaffold => {
                         voxels_fully_full = false;
                         EMPTY
-                    },
-                    // TODO: We should make this use our attributes, later, once we have more blocks that are translucent.
-                    crate::BlockID::Leaves | crate::BlockID::Scaffold => {
-                        voxels_fully_empty = false;
-                        TRANSLUCENT
                     },
                     _ => {
                         voxels_fully_empty = false;
@@ -180,20 +181,52 @@ pub fn update_chunk_meshes (
                 water_voxels_fully_empty = false;
                 FULL
             };
+
+            translucent_voxels[ChunkShape::linearize([(x + 1) as u32, (y + 1) as u32, (z + 1) as u32]) as usize] = 
+            if let Some(chunk) = chunk_map.get(&chunk_position) {
+                match chunk.blocks[block_position].id {
+                    // TODO: We should make this use our attributes, later, once we have more blocks that are translucent.
+                    crate::BlockID::Leaves | crate::BlockID::Scaffold => {
+                        translucent_voxels_fully_empty = false;
+                        TRANSLUCENT
+                    },
+                    _ => {
+                        translucent_voxels_fully_full = false;
+                        EMPTY
+                    }
+                }
+            }
+            else {
+                translucent_voxels_fully_empty = false;
+                FULL
+            };
         }
 
         let faces = RIGHT_HANDED_Y_UP_CONFIG.faces;
 
-        let mut generate_mesh = |voxels: [VisVoxel; ChunkShape::SIZE as usize], material: Handle<StandardMaterial>, render_entity_type: RenderEntity| {
+        let mut generate_mesh = |voxels: [VisVoxel; ChunkShape::SIZE as usize], material: Handle<StandardMaterial>, render_entity_type: RenderEntity, stuipd: bool| {
             let mut buffer = UnitQuadBuffer::new();
-            visible_block_faces(
-                &voxels,
-                &ChunkShape {},
-                [0; 3],
-                [CHUNK_SIZE as u32 + 1, CHUNK_SIZE as u32 + 1, CHUNK_SIZE as u32 + 1],
-                &faces,
-                &mut buffer,
-            );
+            if stuipd {
+                naive_mesh_wrapper(
+                    &voxels,
+                    &ChunkShape {},
+                    [0; 3],
+                    [CHUNK_SIZE as u32 + 1, CHUNK_SIZE as u32 + 1, CHUNK_SIZE as u32 + 1],
+                    &faces,
+                    &mut buffer,
+                );
+            }
+            else {
+                visible_block_faces(
+                    &voxels,
+                    &ChunkShape {},
+                    [0; 3],
+                    [CHUNK_SIZE as u32 + 1, CHUNK_SIZE as u32 + 1, CHUNK_SIZE as u32 + 1],
+                    &faces,
+                    &mut buffer,
+                );
+            }
+            
     
             //println!("unitquadbuffer: {:?}", buffer.groups.clone());
     
@@ -287,28 +320,49 @@ pub fn update_chunk_meshes (
                     NoFrustumCulling,
                 );
 
+                // This code fucking sucks.
                 if let Some(render_entity) = match render_entity_type {
                     RenderEntity::World => chunk_map.get_mut(&**ev).unwrap().render_entity,
                     RenderEntity::Water => chunk_map.get_mut(&**ev).unwrap().water_render_entity,
+                    RenderEntity::Translucent => chunk_map.get_mut(&**ev).unwrap().translucent_render_entity,
                 } {
                     commands.entity(render_entity).insert(render_entity_bundle);
                 }
                 else {
-                    chunk_map.get_mut(&**ev).unwrap().render_entity = Some(
-                        commands.spawn(render_entity_bundle).id()
-                    );
+                    match render_entity_type {
+                        RenderEntity::World => chunk_map.get_mut(&**ev).unwrap().render_entity = Some(commands.spawn(render_entity_bundle).id()),
+                        RenderEntity::Water => chunk_map.get_mut(&**ev).unwrap().water_render_entity = Some(commands.spawn(render_entity_bundle).id()),
+                        RenderEntity::Translucent => chunk_map.get_mut(&**ev).unwrap().translucent_render_entity = Some(commands.spawn(render_entity_bundle).id()),
+                    }
                 }
-                
-                
+            }
+            else {
+                if let Some(render_entity) = match render_entity_type {
+                    RenderEntity::World => chunk_map.get_mut(&**ev).unwrap().render_entity,
+                    RenderEntity::Water => chunk_map.get_mut(&**ev).unwrap().water_render_entity,
+                    RenderEntity::Translucent => chunk_map.get_mut(&**ev).unwrap().translucent_render_entity,
+                } {
+                    commands.entity(render_entity).despawn_recursive();
+
+                    match render_entity_type {
+                        RenderEntity::World => chunk_map.get_mut(&**ev).unwrap().render_entity = None,
+                        RenderEntity::Water => chunk_map.get_mut(&**ev).unwrap().water_render_entity = None,
+                        RenderEntity::Translucent => chunk_map.get_mut(&**ev).unwrap().translucent_render_entity = None,
+                    }
+                }
             }
         };
 
         if !voxels_fully_empty || !voxels_fully_full {
-            generate_mesh(voxels, materials.world_res_8x8.clone(), RenderEntity::World);
+            generate_mesh(voxels, materials.world_res_8x8.clone(), RenderEntity::World, false);
         }
         
         if !water_voxels_fully_empty || !water_voxels_fully_full {
-            generate_mesh(water_voxels, materials.water_res_8x8.clone(), RenderEntity::Water);
+            generate_mesh(water_voxels, materials.water_res_8x8.clone(), RenderEntity::Water, false);
+        }
+
+        if !translucent_voxels_fully_empty || !translucent_voxels_fully_full {
+            generate_mesh(translucent_voxels, materials.translucent_res_8x8.clone(), RenderEntity::Translucent, true);
         }
          
     }
@@ -320,9 +374,7 @@ pub fn modify_materials (
 ) {
     if let Some(world_res_8x8) = material_assets.get_mut(&materials.world_res_8x8) {
         world_res_8x8.unlit = true;
-        world_res_8x8.alpha_mode = AlphaMode::Mask(0.0);
-        //world_res_8x8.cull_mode = None;
-        //world_res_8x8.double_sided = true;
+        world_res_8x8.alpha_mode = AlphaMode::Opaque;
     }
 
     if let Some(water_res_8x8) = material_assets.get_mut(&materials.water_res_8x8) {
@@ -330,6 +382,13 @@ pub fn modify_materials (
         water_res_8x8.alpha_mode = AlphaMode::Blend;
         water_res_8x8.cull_mode = Some(Face::Back);
         water_res_8x8.double_sided = true;
+    }
+
+    if let Some(translucent_res_8x8) = material_assets.get_mut(&materials.translucent_res_8x8) {
+        translucent_res_8x8.unlit = true;
+        translucent_res_8x8.alpha_mode = AlphaMode::Mask(0.0);
+        translucent_res_8x8.cull_mode = None;
+        translucent_res_8x8.double_sided = true;
     }
 }
 
@@ -373,6 +432,7 @@ pub fn update_water_material (
 pub enum RenderEntity {
     World,
     Water,
+    Translucent
 }
 
 #[derive(AssetCollection, Resource)]
@@ -400,5 +460,8 @@ pub struct Materials{
     #[asset(standard_material)]
     #[asset(path = "textures_8x8.png")]
     pub water_res_8x8: Handle<StandardMaterial>,
+    #[asset(standard_material)]
+    #[asset(path = "textures_8x8.png")]
+    pub translucent_res_8x8: Handle<StandardMaterial>,
 
 }
